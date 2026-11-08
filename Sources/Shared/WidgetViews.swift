@@ -40,13 +40,17 @@ enum WidgetPalette {
 }
 
 public struct MenuWidgetView: View {
-    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetFamily) private var envFamily
     @Environment(\.colorScheme) private var scheme
     public let entry: MenuEntry
+    public var familyOverride: WidgetFamily?
 
-    public init(entry: MenuEntry) {
+    public init(entry: MenuEntry, familyOverride: WidgetFamily? = nil) {
         self.entry = entry
+        self.familyOverride = familyOverride
     }
+
+    private var family: WidgetFamily { familyOverride ?? envFamily }
 
     private var todayIndex: Int { Week.todayIndex(on: entry.date) }
     private var hasData: Bool { entry.days.contains { !$0.lunch.isEmpty || !$0.dinner.isEmpty } }

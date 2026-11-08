@@ -102,18 +102,15 @@ struct WidgetPreviewScreen: View {
             VStack(spacing: 20) {
                 switch family {
                 case "widget-small":
-                    MenuWidgetView(entry: entry)
-                        .environment(\.widgetFamily, .systemSmall)
+                    MenuWidgetView(entry: entry, familyOverride: .systemSmall)
                         .frame(width: 155, height: 155)
                         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 case "widget-large":
-                    MenuWidgetView(entry: entry)
-                        .environment(\.widgetFamily, .systemLarge)
+                    MenuWidgetView(entry: entry, familyOverride: .systemLarge)
                         .frame(width: 329, height: 345)
                         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 default:
-                    MenuWidgetView(entry: entry)
-                        .environment(\.widgetFamily, .systemMedium)
+                    MenuWidgetView(entry: entry, familyOverride: .systemMedium)
                         .frame(width: 329, height: 155)
                         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
