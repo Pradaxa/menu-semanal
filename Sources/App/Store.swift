@@ -5,7 +5,7 @@ import WidgetKit
 // MARK: - Tienda principal
 
 final class AppStore: ObservableObject {
-    @Published var dishes: [Dish] { didSet { persist(dishes, "menus.dishes.v1") } }
+    @Published var dishes: [Dish] { didSet { persist(dishes, "menus.dishes.v1"); refreshWidget() } }
     @Published var history: [WeekMenu] { didSet { persist(history, "menus.history.v1"); refreshWidget() } }
     @Published var drafts: [DraftMenu] { didSet { persist(drafts, "menus.drafts.v1"); refreshWidget() } }
     @Published var learning: Learning { didSet { persist(learning, "menus.prefs.v1") } }

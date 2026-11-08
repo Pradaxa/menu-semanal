@@ -92,6 +92,22 @@ struct SunMoonToggle: View {
     private let travel: CGFloat = 24
 
     var body: some View {
+        // Button + SilentButtonStyle: con onTapGesture, iOS 26 pinta un recuadro gris
+        // translúcido al pulsar. Con un estilo que no toca la etiqueta no aparece nada,
+        // solo la animación del interruptor, igual que en la web.
+        Button {
+            withAnimation(reduceMotion ? .none : .spring(response: 0.5, dampingFraction: 0.65)) {
+                isDark.toggle()
+            }
+        } label: {
+            graphic
+        }
+        .buttonStyle(SilentButtonStyle())
+        .accessibilityLabel("Modo oscuro")
+        .accessibilityValue(isDark ? "Activado" : "Desactivado")
+    }
+
+    private var graphic: some View {
         ZStack(alignment: .leading) {
             // Pista: cielo de día / noche
             RoundedRectangle(cornerRadius: 999, style: .continuous)
@@ -154,14 +170,12 @@ struct SunMoonToggle: View {
             .offset(x: isDark ? travel : 3, y: 0)
         }
         .frame(width: trackWidth + 6, height: trackHeight)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(reduceMotion ? .none : .spring(response: 0.5, dampingFraction: 0.65)) {
-                isDark.toggle()
-            }
-        }
-        .accessibilityLabel("Modo oscuro")
-        .accessibilityValue(isDark ? "Activado" : "Desactivado")
-        .accessibilityAddTraits(.isButton)
+    }
+}
+
+/// Estilo de botón sin feedback visual (ni opacidad ni fondo al pulsar).
+struct SilentButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
     }
 }

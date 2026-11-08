@@ -39,6 +39,16 @@ jobs:
           xcrun simctl boot "$DEVICE" || true
           xcrun simctl bootstatus "$DEVICE" -b
           APP=$(find build-sim/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "MenuSemanal.app")
+          # Firma ad-hoc para embeber los entitlements: sin la sección __entitlements
+          # el App Group no existe y el widget no puede leer los datos de la app.
+          codesign --force --sign "-" --entitlements Entitlements/Widget.entitlements "$APP/PlugIns/MenuWidget.appex"
+          codesign --force --sign "-" --entitlements Entitlements/App.entitlements "$APP"
+          for X in "$APP" "$APP/PlugIns/MenuWidget.appex"; do
+            if ! codesign -d --entitlements :- "$X" 2>/dev/null | grep -q application-groups; then
+              echo "FALTAN entitlements de App Group en $X"
+              exit 1
+            fi
+          done
           xcrun simctl install "$DEVICE" "$APP"
           BID=com.pradaxa.menusemanal
           echo "== Selftest =="
@@ -76,7 +86,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            MARKETING_VERSION="0.2.${{ github.run_number }}" \
+            MARKETING_VERSION="0.3.${{ github.run_number }}" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             build
 
@@ -84,6 +94,19 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R "build/Build/Products/Release-iphoneos/MenuSemanal.app" Payload/
+          APP="Payload/MenuSemanal.app"
+          # Firma ad-hoc SOLO para embeber los entitlements en el binario. AltStore
+          # vuelve a firmar al instalar y toma los App Groups de esta sección; sin
+          # ella el widget no comparte datos con la app.
+          codesign --force --sign "-" --entitlements Entitlements/Widget.entitlements "$APP/PlugIns/MenuWidget.appex"
+          codesign --force --sign "-" --entitlements Entitlements/App.entitlements "$APP"
+          for X in "$APP" "$APP/PlugIns/MenuWidget.appex"; do
+            if ! codesign -d --entitlements :- "$X" 2>/dev/null | grep -q application-groups; then
+              echo "FALTAN entitlements de App Group en $X"
+              exit 1
+            fi
+          done
+          echo "Entitlements de App Group verificados en app y widget"
           zip -r -q MenuSemanal.ipa Payload
           ls -lh MenuSemanal.ipa
 
@@ -91,15 +114,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v0.2.${{ github.run_number }}"
+          TAG="v0.3.${{ github.run_number }}"
           gh release create "$TAG" MenuSemanal.ipa \
             --title "Menú $TAG" \
             --notes "Build automática ${{ github.run_number }}"
 
       - name: Update AltStore source
         run: |
-          TAG="v0.2.${{ github.run_number }}"
-          VER="0.2.${{ github.run_number }}"
+          TAG="v0.3.${{ github.run_number }}"
+          VER="0.3.${{ github.run_number }}"
           BUILD="${{ github.run_number }}"
           SIZE=$(stat -f%z MenuSemanal.ipa)
           DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)

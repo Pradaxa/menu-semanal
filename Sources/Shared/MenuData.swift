@@ -1,4 +1,5 @@
 import Foundation
+import Security
 
 // MARK: - Modelos compartidos (app + widget)
 
@@ -217,7 +218,20 @@ public struct WidgetDay: Hashable {
 }
 
 public enum SharedMenuReader {
-    public static let suiteName = "group.com.pradaxa.menusemanal"
+    /// Respaldo para builds sin entitlements embebidos (p. ej. algunas de simulador).
+    public static let fallbackSuiteName = "group.com.pradaxa.menusemanal"
+
+    /// ID real del App Group, leído de los entitlements del proceso en ejecución.
+    /// AltStore puede reasignar el ID al firmar con la cuenta del usuario; leyéndolo
+    /// en tiempo de ejecución, app y widget comparten siempre el mismo contenedor.
+    public static var suiteName: String {
+        if let task = SecTaskCreateFromSelf(nil),
+           let groups = SecTaskCopyValueForEntitlement(task, "com.apple.security.application-groups" as CFString, nil) as? [String],
+           let first = groups.first, !first.isEmpty {
+            return first
+        }
+        return fallbackSuiteName
+    }
 
     static func read<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
         guard let data = UserDefaults(suiteName: suiteName)?.data(forKey: key) else { return nil }

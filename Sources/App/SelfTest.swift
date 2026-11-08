@@ -121,6 +121,22 @@ enum SelfTest {
         // 13. Semilla: los 31 platos iniciales
         check("seed-31-dishes", dishes.count == 31)
 
+        // 14. App Group: la suite compartida con el widget persiste de verdad.
+        // Sin entitlement embebido (IPA sin firmar) UserDefaults(suiteName:) no
+        // persiste y el widget se queda sin datos: esta prueba lo detecta.
+        let suiteName = SharedMenuReader.suiteName
+        check("appgroup-resolved", !suiteName.isEmpty)
+        if let suite = UserDefaults(suiteName: suiteName) {
+            let probeKey = "selftest.probe.v1"
+            let probe = Data([1, 2, 3, 42])
+            suite.set(probe, forKey: probeKey)
+            let readBack = UserDefaults(suiteName: suiteName)?.data(forKey: probeKey)
+            suite.removeObject(forKey: probeKey)
+            check("appgroup-persists", readBack == probe)
+        } else {
+            check("appgroup-persists", false)
+        }
+
         if failures.isEmpty {
             print("SELFTEST-PASS all")
         } else {
