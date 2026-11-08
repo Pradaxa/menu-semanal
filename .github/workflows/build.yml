@@ -23,7 +23,51 @@ jobs:
       - name: Generate project
         run: xcodegen
 
-      - name: Build (unsigned)
+      - name: Simulator build + pruebas + capturas
+        run: |
+          set -e
+          xcodebuild \
+            -project MenuSemanal.xcodeproj \
+            -scheme MenuSemanal \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          DEVICE=$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | select(.key | test("iOS")) | .value[] | select(.name | test("iPhone"))] | sort_by(.name) | .[-1].udid')
+          echo "Simulador: $DEVICE"
+          xcrun simctl boot "$DEVICE" || true
+          xcrun simctl bootstatus "$DEVICE" -b
+          APP=$(find build-sim/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "MenuSemanal.app")
+          xcrun simctl install "$DEVICE" "$APP"
+          BID=com.pradaxa.menusemanal
+          echo "== Selftest =="
+          xcrun simctl launch --console-pty "$DEVICE" "$BID" -selftest 2>&1 | tee selftest.log | grep SELFTEST || true
+          sleep 2
+          if grep -q "SELFTEST-FAIL" selftest.log || ! grep -q "SELFTEST-PASS all" selftest.log; then
+            echo "Hay pruebas fallidas o el selftest no terminó"
+            exit 1
+          fi
+          mkdir -p shots
+          for MODE in light dark; do
+            xcrun simctl ui "$DEVICE" appearance $MODE
+            for SCREEN in menu platos compra ajustes widget-medium widget-large widget-small; do
+              xcrun simctl terminate "$DEVICE" "$BID" 2>/dev/null || true
+              xcrun simctl launch "$DEVICE" "$BID" -screenshot $SCREEN >/dev/null 2>&1 || true
+              sleep 5
+              xcrun simctl io "$DEVICE" screenshot "shots/${MODE}-${SCREEN}.png" || true
+            done
+          done
+          ls -la shots/
+
+      - name: Subir capturas
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: shots/
+          if-no-files-found: ignore
+
+      - name: Build IPA (unsigned)
         run: |
           xcodebuild \
             -project MenuSemanal.xcodeproj \
@@ -32,7 +76,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            MARKETING_VERSION="0.1.${{ github.run_number }}" \
+            MARKETING_VERSION="0.2.${{ github.run_number }}" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             build
 
@@ -47,15 +91,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v0.1.${{ github.run_number }}"
+          TAG="v0.2.${{ github.run_number }}"
           gh release create "$TAG" MenuSemanal.ipa \
             --title "Menú $TAG" \
             --notes "Build automática ${{ github.run_number }}"
 
       - name: Update AltStore source
         run: |
-          TAG="v0.1.${{ github.run_number }}"
-          VER="0.1.${{ github.run_number }}"
+          TAG="v0.2.${{ github.run_number }}"
+          VER="0.2.${{ github.run_number }}"
           BUILD="${{ github.run_number }}"
           SIZE=$(stat -f%z MenuSemanal.ipa)
           DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
