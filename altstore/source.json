@@ -1,0 +1,25 @@
+{
+  "name": "Menú Semanal",
+  "identifier": "com.pradaxa.menusemanal.source",
+  "sourceURL": "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/source.json",
+  "apps": [
+    {
+      "name": "Menú",
+      "bundleIdentifier": "com.pradaxa.menusemanal",
+      "developerName": "Pradaxa",
+      "localizedDescription": "Tu menú semanal con widget para la pantalla de inicio.",
+      "iconURL": "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/icon.png",
+      "tintColor": "34C759",
+      "versions": [
+        {
+          "version": "0.1.1",
+          "buildVersion": "1",
+          "date": "2026-11-08T16:20:36Z",
+          "downloadURL": "https://github.com/Pradaxa/menu-semanal/releases/download/v0.1.1/MenuSemanal.ipa",
+          "size": 69272,
+          "minOSVersion": "17.0"
+        }
+      ]
+    }
+  ]
+}
