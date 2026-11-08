@@ -221,16 +221,26 @@ public enum SharedMenuReader {
     /// Respaldo para builds sin entitlements embebidos (p. ej. algunas de simulador).
     public static let fallbackSuiteName = "group.com.pradaxa.menusemanal"
 
-    /// ID real del App Group, leído de los entitlements del proceso en ejecución.
+    /// ID real del App Group, leído de los entitlements embebidos en el propio binario.
     /// AltStore puede reasignar el ID al firmar con la cuenta del usuario; leyéndolo
-    /// en tiempo de ejecución, app y widget comparten siempre el mismo contenedor.
+    /// del binario firmado final, app y widget comparten siempre el mismo contenedor.
     public static var suiteName: String {
-        if let task = SecTaskCreateFromSelf(nil),
-           let groups = SecTaskCopyValueForEntitlement(task, "com.apple.security.application-groups" as CFString, nil) as? [String],
-           let first = groups.first, !first.isEmpty {
+        if let groups = embeddedAppGroups(), let first = groups.first, !first.isEmpty {
             return first
         }
         return fallbackSuiteName
+    }
+
+    /// Lee la sección __TEXT,__entitlements del binario en ejecución (image 0:
+    /// el ejecutable del proceso; en el widget es el .appex) y extrae los App Groups.
+    private static func embeddedAppGroups() -> [String]? {
+        guard let header = _dyld_get_image_header(0) else { return nil }
+        let header64 = UnsafeRawPointer(header).assumingMemoryBound(to: mach_header_64.self)
+        var size: UInt = 0
+        guard let section = getsectiondata(header64, "__TEXT", "__entitlements", &size), size > 0 else { return nil }
+        let data = Data(bytes: section, count: Int(size))
+        guard let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any] else { return nil }
+        return plist["com.apple.security.application-groups"] as? [String]
     }
 
     static func read<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
