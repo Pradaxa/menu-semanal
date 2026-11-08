@@ -40,6 +40,8 @@ struct ShoppingView: View {
                     if grouped.isEmpty && week.extras.isEmpty {
                         GlassCard {
                             VStack(spacing: 8) {
+                                Text("🛒")
+                                    .font(.largeTitle)
                                 Text("Nada que comprar")
                                     .font(.headline)
                                 Text("Genera o escribe el menú de esta semana y aquí aparecerá la compra.")
@@ -58,6 +60,8 @@ struct ShoppingView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
+                .animation(.appSpring, value: week.states)
+                .animation(.appSpring, value: grouped.map { $0.0 })
             }
             .background(AppBackground())
             .navigationTitle("Compra")
@@ -89,21 +93,22 @@ struct ShoppingView: View {
                     Text("\(doneCount) de \(totalCount)")
                         .font(.headline)
                     Spacer()
-                    Text("\(Int(pct * 100))%")
+                    Text(pct >= 1 ? "¡Lista! 🎉" : "\(Int(pct * 100))%")
                         .font(.subheadline)
-                        .foregroundStyle(Color.ink2(scheme))
+                        .foregroundStyle(pct >= 1 ? Color.tealScheme(scheme) : Color.ink2(scheme))
                 }
                 ProgressView(value: pct)
                     .tint(Color.tealScheme(scheme))
             }
         }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
     private func sectionCard(_ section: String, _ sectionItems: [ShoppingItem]) -> some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text(section)
+                    Text("\(FunEmoji.shoppingSection(section)) \(section)")
                         .font(.caption.bold())
                         .textCase(.uppercase)
                         .tracking(1.2)
@@ -142,7 +147,7 @@ struct ShoppingView: View {
             if !mine.isEmpty {
                 GlassCard {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Añadidos por ti")
+                        Text("✏️ Añadidos por ti")
                             .font(.caption.bold())
                             .textCase(.uppercase)
                             .tracking(1.2)

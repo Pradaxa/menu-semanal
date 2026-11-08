@@ -179,3 +179,37 @@ struct SilentButtonStyle: ButtonStyle {
         configuration.label
     }
 }
+
+// MARK: - Animación estándar (una sola curva; una animación nueva interrumpe a la anterior con suavidad, nunca se apilan)
+
+extension Animation {
+    static let appSpring = Animation.spring(response: 0.45, dampingFraction: 0.82)
+}
+
+// MARK: - Emojis de categoría (toque visual, coherente con los puntos naranja/azul)
+
+enum FunEmoji {
+    static func dish(_ dish: Dish) -> String {
+        for tag in dish.tags {
+            if let e = dishMap[tag] { return e }
+        }
+        return "🍽️"
+    }
+
+    private static let dishMap: [String: String] = [
+        "pollo": "🍗", "carne": "🥩", "pescado": "🐟", "marisco": "🦐",
+        "pasta": "🍝", "arroz": "🍚", "legumbre": "🫘", "verdura": "🥦",
+        "ensalada": "🥗", "huevo": "🍳", "patata": "🥔",
+    ]
+
+    static func shoppingSection(_ section: String) -> String {
+        switch section {
+        case "Fruta y verdura": return "🥬"
+        case "Carne y pescado": return "🥩"
+        case "Lácteos y huevos": return "🧀"
+        case "Despensa": return "🥫"
+        case "Hogar": return "🧴"
+        default: return "🛒"
+        }
+    }
+}

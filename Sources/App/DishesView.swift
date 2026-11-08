@@ -16,6 +16,33 @@ struct DishesView: View {
         return sorted.filter { TextNorm.dt($0.name).contains(q) }
     }
 
+    /// Buscador abajo, pegado al dock (a petición de Adrián)
+    private var searchPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Color.ink2(scheme))
+            TextField("Buscar plato", text: $query)
+                .foregroundStyle(Color.ink(scheme))
+            if !query.isEmpty {
+                Button { withAnimation(.appSpring) { query = "" } } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Color.ink2(scheme).opacity(0.6))
+                }
+                .accessibilityLabel("Borrar búsqueda")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(scheme == .dark ? Color.white.opacity(0.14) : Color.white.opacity(0.78))
+                .shadow(color: Color.black.opacity(scheme == .dark ? 0.3 : 0.08), radius: 8, x: 0, y: 3)
+        )
+        .overlay(Capsule().strokeBorder(Color.white.opacity(scheme == .dark ? 0.15 : 0.7), lineWidth: 1))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -23,7 +50,9 @@ struct DishesView: View {
                     ForEach(filtered) { dish in
                         Button { editing = dish } label: {
                             GlassCard {
-                                HStack {
+                                HStack(spacing: 12) {
+                                    Text(FunEmoji.dish(dish))
+                                        .font(.title2)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(dish.name)
                                             .font(.headline)
@@ -46,9 +75,10 @@ struct DishesView: View {
                 .padding(.bottom, 24)
             }
             .background(AppBackground())
+            .safeAreaInset(edge: .bottom) { searchPill }
+            .animation(.appSpring, value: filtered)
             .navigationTitle("Platos")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "Buscar plato")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { adding = true } label: {

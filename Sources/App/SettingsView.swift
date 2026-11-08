@@ -46,7 +46,7 @@ struct SettingsView: View {
         GlassCard {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Modo oscuro")
+                    Text("Modo oscuro 🌗")
                         .font(.headline)
                     Text(store.darkOverride == nil
                          ? "Siguiendo el modo del iPhone"
@@ -73,7 +73,7 @@ struct SettingsView: View {
     private var learningCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Lo que he aprendido")
+                Text("Lo que he aprendido 🧠")
                     .font(.headline)
                 let l = store.learning
                 if l.weeks == 0 && l.kept.isEmpty && l.added.isEmpty && l.removed.isEmpty {
@@ -100,7 +100,7 @@ struct SettingsView: View {
     private var backupCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Copia de seguridad")
+                Text("Copia de seguridad 💾")
                     .font(.headline)
                 Text("Guarda tus platos, menús, historial, aprendizaje y compra. La clave de Gemini no se incluye. La copia es manual: repítela después de cambios importantes.")
                     .font(.callout)
@@ -155,7 +155,7 @@ struct SettingsView: View {
     private var geminiCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Clave de Gemini (IA)")
+                Text("Clave de Gemini (IA) ✨")
                     .font(.headline)
                 Text("Solo se guarda en este iPhone. Sin clave, los menús se generan con tus reglas, que ya funcionan muy bien.")
                     .font(.callout)
@@ -204,7 +204,7 @@ struct SettingsView: View {
     private var infoCard: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Privacidad")
+                Text("Privacidad 🔒")
                     .font(.headline)
                 Text("Todo se guarda solo en tu iPhone. Sin cuentas, sin servidores, sin analítica ni rastreo. La clave de Gemini viaja únicamente a Google cuando usas las funciones de IA. Política completa en la web del proyecto.")
                     .font(.callout)

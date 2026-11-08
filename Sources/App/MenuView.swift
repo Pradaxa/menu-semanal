@@ -24,12 +24,17 @@ struct MenuView: View {
                 VStack(spacing: 14) {
                     weekNavigator
                     actionButtons
+                    if resolved.menu.slots.isEmpty && !resolved.confirmed {
+                        emptyHero
+                    }
                     ForEach(0..<7, id: \.self) { day in
                         dayCard(day)
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
+                .animation(.appSpring, value: resolved.menu.slots)
+                .animation(.appSpring, value: resolved.confirmed)
             }
             .background(AppBackground())
             .navigationTitle("Menú")
@@ -57,7 +62,7 @@ struct MenuView: View {
                 Text(Week.label(for: weekKey))
                     .font(.headline)
                 if resolved.confirmed {
-                    Text("Confirmado")
+                    Label("Confirmado", systemImage: "checkmark.seal.fill")
                         .font(.caption)
                         .foregroundStyle(Color.tealScheme(scheme))
                 }
@@ -74,6 +79,23 @@ struct MenuView: View {
 
     private var emptySlots: Int {
         14 - resolved.menu.slots.count
+    }
+
+    private var emptyHero: some View {
+        GlassCard {
+            VStack(spacing: 8) {
+                Text("🤔")
+                    .font(.largeTitle)
+                Text("¿Qué comemos esta semana?")
+                    .font(.headline)
+                Text("Pulsa Generar menú y te propongo una semana con tus reglas. Luego la dejas a tu gusto.")
+                    .font(.callout)
+                    .foregroundStyle(Color.ink2(scheme))
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.97)))
     }
 
     @ViewBuilder
@@ -239,8 +261,11 @@ struct SlotPickerSheet: View {
                     }
                 }
                 if query.isEmpty && !suggestions.isEmpty {
-                    Section("Sugerencias") {
-                        ForEach(suggestions) { dish in dishRow(dish) }
+                    Section("✨ Sugerencias para ti") {
+                        ForEach(suggestions) { dish in
+                            dishRow(dish)
+                                .listRowBackground(Color.tealScheme(scheme).opacity(scheme == .dark ? 0.22 : 0.14))
+                        }
                     }
                 }
                 Section(query.isEmpty ? "Todos los platos" : "Resultados") {
@@ -287,12 +312,15 @@ struct SlotPickerSheet: View {
             store.setSlot(dish.id, day: day, meal: meal, in: weekKey)
             dismiss()
         } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(dish.name).foregroundStyle(Color.ink(scheme))
-                if !dish.tags.isEmpty {
-                    Text(dish.tags.joined(separator: " · "))
-                        .font(.caption)
-                        .foregroundStyle(Color.ink2(scheme))
+            HStack(spacing: 10) {
+                Text(FunEmoji.dish(dish))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(dish.name).foregroundStyle(Color.ink(scheme))
+                    if !dish.tags.isEmpty {
+                        Text(dish.tags.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(Color.ink2(scheme))
+                    }
                 }
             }
         }
