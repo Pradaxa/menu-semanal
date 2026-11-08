@@ -40,10 +40,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pradaxa.menusemanal.widget
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: "Menú Widget"
-        INFOPLIST_KEY_NSExtension_PointIdentifier: com.apple.widgetkit-extension
-        INFOPLIST_KEY_NSExtension_PrincipalClass: "$(PRODUCT_MODULE_NAME).MenuWidgetBundle"
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Sources/Widget/Info.plist
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_ENTITLEMENTS: Entitlements/Widget.entitlements
         CODE_SIGNING_ALLOWED: NO
