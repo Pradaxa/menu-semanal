@@ -77,7 +77,7 @@ enum SelfTest {
         // 8. Normalización
         check("norm-plural", TextNorm.ct("Patatas") == "patata")
         check("norm-accent", TextNorm.dt("Jamón") == "jamon")
-        check("norm-ñ", TextNorm.ct("Champiñones") == "champiñone")
+        check("norm-ñ", TextNorm.ct("Champiñones") == "champiñon")
 
         // 9. Adivinador de ingredientes
         let g1 = IngredientGuesser.guess("Pollo asado")
