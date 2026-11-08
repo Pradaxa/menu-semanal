@@ -1,0 +1,48 @@
+name: MenuSemanal
+options:
+  bundleIdPrefix: com.pradaxa
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+targets:
+  MenuSemanal:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/App
+      - path: Sources/Shared
+    dependencies:
+      - target: MenuWidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pradaxa.menusemanal
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Menú"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait"
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: Entitlements/App.entitlements
+        CODE_SIGNING_ALLOWED: NO
+  MenuWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/Widget
+      - path: Sources/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pradaxa.menusemanal.widget
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: "Menú Widget"
+        INFOPLIST_KEY_NSExtension_PointIdentifier: com.apple.widgetkit-extension
+        INFOPLIST_KEY_NSExtension_PrincipalClass: "$(PRODUCT_MODULE_NAME).MenuWidgetBundle"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_ENTITLEMENTS: Entitlements/Widget.entitlements
+        CODE_SIGNING_ALLOWED: NO
