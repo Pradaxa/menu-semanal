@@ -17,6 +17,7 @@ targets:
     sources:
       - path: Sources/App
       - path: Sources/Shared
+      - path: Sources/App/Assets.xcassets
     dependencies:
       - target: MenuWidget
     settings:
