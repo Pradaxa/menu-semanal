@@ -1,0 +1,90 @@
+name: build-ios
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate project
+        run: xcodegen
+
+      - name: Build (unsigned)
+        run: |
+          xcodebuild \
+            -project MenuSemanal.xcodeproj \
+            -scheme MenuSemanal \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="0.1.${{ github.run_number }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R "build/Build/Products/Release-iphoneos/MenuSemanal.app" Payload/
+          zip -r -q MenuSemanal.ipa Payload
+          ls -lh MenuSemanal.ipa
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v0.1.${{ github.run_number }}"
+          gh release create "$TAG" MenuSemanal.ipa \
+            --title "Menú $TAG" \
+            --notes "Build automática ${{ github.run_number }}"
+
+      - name: Update AltStore source
+        run: |
+          TAG="v0.1.${{ github.run_number }}"
+          VER="0.1.${{ github.run_number }}"
+          BUILD="${{ github.run_number }}"
+          SIZE=$(stat -f%z MenuSemanal.ipa)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          jq -n \
+            --arg ver "$VER" --arg build "$BUILD" --arg date "$DATE" --argjson size "$SIZE" \
+            --arg url "https://github.com/Pradaxa/menu-semanal/releases/download/$TAG/MenuSemanal.ipa" \
+            '{
+              name: "Menú Semanal",
+              identifier: "com.pradaxa.menusemanal.source",
+              sourceURL: "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/source.json",
+              apps: [{
+                name: "Menú",
+                bundleIdentifier: "com.pradaxa.menusemanal",
+                developerName: "Pradaxa",
+                localizedDescription: "Tu menú semanal con widget para la pantalla de inicio.",
+                iconURL: "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/icon.png",
+                tintColor: "34C759",
+                versions: [{
+                  version: $ver,
+                  buildVersion: $build,
+                  date: $date,
+                  downloadURL: $url,
+                  size: $size,
+                  minOSVersion: "17.0"
+                }]
+              }]
+            }' > altstore/source.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add altstore/source.json
+          git commit -m "AltStore source $TAG [skip ci]" || echo "sin cambios"
+          git push
