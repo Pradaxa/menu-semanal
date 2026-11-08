@@ -111,26 +111,46 @@ struct MenuView: View {
             .tint(Color.tealScheme(scheme))
         } else {
             HStack(spacing: 10) {
-                Button {
-                    runGenerate(fillOnly: false)
-                } label: {
-                    Label(resolved.menu.slots.isEmpty ? "Generar menú" : "Regenerar", systemImage: "wand.and.stars")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.tealScheme(scheme))
-                .disabled(generating || store.dishes.isEmpty)
-
-                if !resolved.menu.slots.isEmpty && emptySlots > 0 {
+                if store.geminiKey.isEmpty {
                     Button {
-                        runGenerate(fillOnly: true)
+                        runGenerate(fillOnly: false)
                     } label: {
-                        Label(store.geminiKey.isEmpty ? "Completar huecos" : "Completar con IA", systemImage: "sparkles")
+                        Label(resolved.menu.slots.isEmpty ? "Generar menú" : "Regenerar", systemImage: "wand.and.stars")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                     .tint(Color.tealScheme(scheme))
                     .disabled(generating || store.dishes.isEmpty)
+                } else {
+                    Button {
+                        runGenerate(fillOnly: false)
+                    } label: {
+                        Label(resolved.menu.slots.isEmpty ? "Generar menú con IA" : "Regenerar con IA", systemImage: "wand.and.stars")
+                    }
+                    .buttonStyle(MagicButtonStyle())
+                    .disabled(generating || store.dishes.isEmpty)
+                }
+
+                if !resolved.menu.slots.isEmpty && emptySlots > 0 {
+                    if store.geminiKey.isEmpty {
+                        Button {
+                            runGenerate(fillOnly: true)
+                        } label: {
+                            Label("Completar huecos", systemImage: "sparkles")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Color.tealScheme(scheme))
+                        .disabled(generating || store.dishes.isEmpty)
+                    } else {
+                        Button {
+                            runGenerate(fillOnly: true)
+                        } label: {
+                            Label("Completar con IA", systemImage: "sparkles")
+                        }
+                        .buttonStyle(MagicButtonStyle())
+                        .disabled(generating || store.dishes.isEmpty)
+                    }
                 }
             }
             if !resolved.menu.slots.isEmpty {

@@ -180,6 +180,46 @@ struct SilentButtonStyle: ButtonStyle {
     }
 }
 
+// MARK: - Botón mágico (acciones con IA: degradado + brillo que barre en bucle suave)
+
+struct MagicButtonStyle: ButtonStyle {
+    private let gradient = LinearGradient(
+        colors: [Color(red: 0.56, green: 0.44, blue: 0.90),   // violeta
+                 Color(red: 0.36, green: 0.60, blue: 0.95),   // azul
+                 Color(red: 0.42, green: 0.72, blue: 0.65)],  // menta de la app
+        startPoint: .leading, endPoint: .trailing)
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(gradient)
+            .overlay(shimmer)
+            .clipShape(Capsule())
+            .shadow(color: Color(red: 0.45, green: 0.52, blue: 0.95).opacity(0.35), radius: 8, x: 0, y: 4)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.appSpring, value: configuration.isPressed)
+    }
+
+    /// Banda de brillo que cruza la cápsula en ping-pong: una sola animación en bucle.
+    private var shimmer: some View {
+        GeometryReader { geo in
+            LinearGradient(colors: [.clear, .white.opacity(0.4), .clear],
+                           startPoint: .leading, endPoint: .trailing)
+                .frame(width: geo.size.width * 0.45)
+                .phaseAnimator([false, true]) { content, phase in
+                    content.offset(x: phase ? geo.size.width * 1.45 : -geo.size.width * 0.45)
+                } animation: { _ in
+                    .linear(duration: 2.8)
+                }
+        }
+        .allowsHitTesting(false)
+        .clipShape(Capsule())
+    }
+}
+
 // MARK: - Animación estándar (una sola curva; una animación nueva interrumpe a la anterior con suavidad, nunca se apilan)
 
 extension Animation {

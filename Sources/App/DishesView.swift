@@ -230,11 +230,17 @@ struct DishEditorSheet: View {
                             fillWithAI()
                         } label: {
                             HStack {
-                                if working { ProgressView().scaleEffect(0.8) }
+                                if working {
+                                    ProgressView().scaleEffect(0.8).tint(.white)
+                                } else {
+                                    Image(systemName: "sparkles")
+                                }
                                 Text(working ? "Preguntando a la IA…" : "Rellenar ingredientes con IA")
                             }
                         }
+                        .buttonStyle(MagicButtonStyle())
                         .disabled(working || dish.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .listRowBackground(Color.clear)
                     }
                 } header: {
                     Text("Ingredientes")
