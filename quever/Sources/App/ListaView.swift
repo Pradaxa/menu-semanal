@@ -163,7 +163,7 @@ struct ListaView: View {
         } else {
             let items = Array(vistasSorted.prefix(vistasShown))
             let groups = groupByMonth(items)
-            ForEach(groups, id: \.name) { group in
+            ForEach(Array(groups.enumerated()), id: \.offset) { _, group in
                 GlassCard {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack {

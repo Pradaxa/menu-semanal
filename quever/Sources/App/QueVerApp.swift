@@ -86,22 +86,12 @@ struct QVHeader: View {
                 .font(.system(size: 26, weight: .regular, design: .serif))
                 .foregroundStyle(Color.ink(scheme))
             Spacer()
-            Image(uiImage: appIcon())
+            Image("HeaderIcon")
                 .resizable()
                 .frame(width: 40, height: 40)
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .shadow(color: Color(red: 0.259, green: 0.212, blue: 0.188).opacity(0.16), radius: 6, x: 0, y: 3)
         }
         .padding(.horizontal, 4)
-    }
-
-    private func appIcon() -> UIImage {
-        if let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
-           let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
-           let files = primary["CFBundleIconFiles"] as? [String],
-           let name = files.last, let img = UIImage(named: name) {
-            return img
-        }
-        return UIImage()
     }
 }

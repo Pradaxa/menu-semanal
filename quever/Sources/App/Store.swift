@@ -225,6 +225,7 @@ extension QVTitle {
         self.imdbId = d["imdbId"] as? String
         if let v = d["imdb"] as? Double { self.imdb = v }
         else if let s = d["imdb"] as? String { self.imdb = Double(s) }
+        else { self.imdb = nil }
         self.director = d["director"] as? [String] ?? []
         self.actors = d["actors"] as? [String] ?? []
         self.synopsis = d["synopsis"] as? String ?? ""
