@@ -33,6 +33,7 @@ struct AjustesView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .background(AppBackground())
         }
         .fileExporter(isPresented: $showExporter, document: exportDoc, contentType: .json, defaultFilename: "que-ver-datos.json") { _ in }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.json]) { result in

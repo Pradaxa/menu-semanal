@@ -37,6 +37,7 @@ struct ListaView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .background(AppBackground())
             .sheet(item: $selected) { item in
                 DetailView(item: item)
                     .environmentObject(store)

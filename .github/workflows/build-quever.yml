@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths: ['quever/**', '.github/workflows/build-quever.yml']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publicar tras verificar permisos de proveedores y capturas
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -95,6 +100,7 @@ jobs:
           ls -lh QueVer.ipa
 
       - name: Publish release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -118,6 +124,7 @@ jobs:
           done
 
       - name: Update AltStore source
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
         run: |
           TAG="qv-0.1.${{ github.run_number }}"
           VER="0.1.${{ github.run_number }}"

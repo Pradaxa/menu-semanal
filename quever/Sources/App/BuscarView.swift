@@ -43,6 +43,7 @@ struct BuscarView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .background(AppBackground())
             .scrollDismissesKeyboard(.interactively)
             .sheet(item: $selected) { item in
                 DetailView(item: item)
