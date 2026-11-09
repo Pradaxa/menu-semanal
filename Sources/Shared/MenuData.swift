@@ -1,5 +1,5 @@
 import Foundation
-import Security
+import MachO
 
 // MARK: - Modelos compartidos (app + widget)
 
