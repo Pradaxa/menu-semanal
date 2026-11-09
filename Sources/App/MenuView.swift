@@ -24,7 +24,7 @@ struct MenuView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     Text("Menú semanal")
-                        .font(.system(size: 28, weight: .semibold, design: .serif))
+                        .font(.largeTitle.bold())
                         .foregroundStyle(Color.ink(scheme))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityAddTraits(.isHeader)
