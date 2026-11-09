@@ -47,7 +47,7 @@ struct TopView: View {
                             }
                         }
                     }
-                    body
+                    listBody
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -66,7 +66,7 @@ struct TopView: View {
     }
 
     @ViewBuilder
-    private var body: some View {
+    private var listBody: some View {
         if let list = lists[key] {
             GlassCard {
                 VStack(alignment: .leading, spacing: 0) {
