@@ -12,11 +12,11 @@
       "tintColor": "34C759",
       "versions": [
         {
-          "version": "0.3.14",
-          "buildVersion": "14",
-          "date": "2026-11-09T00:18:15Z",
-          "downloadURL": "https://github.com/Pradaxa/menu-semanal/releases/download/v0.3.14/MenuSemanal.ipa",
-          "size": 1223248,
+          "version": "0.3.15",
+          "buildVersion": "15",
+          "date": "2026-11-09T06:32:05Z",
+          "downloadURL": "https://github.com/Pradaxa/menu-semanal/releases/download/v0.3.15/MenuSemanal.ipa",
+          "size": 1223254,
           "minOSVersion": "17.0"
         }
       ]
