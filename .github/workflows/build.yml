@@ -64,6 +64,8 @@ jobs:
             echo "Hay pruebas fallidas o el selftest no terminó"
             exit 1
           fi
+          # Deja desaparecer los avisos iniciales del simulador antes de capturar.
+          sleep 20
           mkdir -p shots
           for MODE in light dark; do
             xcrun simctl ui "$DEVICE" appearance $MODE
