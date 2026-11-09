@@ -16,7 +16,7 @@ struct DishesView: View {
         return sorted.filter { TextNorm.dt($0.name).contains(q) }
     }
 
-    /// Buscador abajo, pegado al dock (a petición de Adrián)
+    /// Pie fijo dentro del área segura: fondo opaco para que no se lean platos detrás.
     private var searchPill: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
@@ -35,16 +35,20 @@ struct DishesView: View {
         .padding(.vertical, 10)
         .background(
             Capsule()
-                .fill(scheme == .dark ? Color.white.opacity(0.14) : Color.white.opacity(0.78))
+                .fill(scheme == .dark
+                      ? Color(red: 0.12, green: 0.15, blue: 0.14)
+                      : Color(red: 0.96, green: 0.97, blue: 0.94))
                 .shadow(color: Color.black.opacity(scheme == .dark ? 0.3 : 0.08), radius: 8, x: 0, y: 3)
         )
         .overlay(Capsule().strokeBorder(Color.white.opacity(scheme == .dark ? 0.15 : 0.7), lineWidth: 1))
         .padding(.horizontal, 16)
-        .padding(.bottom, 6)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
     }
 
     var body: some View {
         NavigationStack {
+            VStack(spacing: 0) {
             ScrollView {
                 VStack(spacing: 12) {
                     ForEach(filtered) { dish in
@@ -74,8 +78,10 @@ struct DishesView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
+            searchPill
+            }
             .background(AppBackground())
-            .safeAreaInset(edge: .bottom) { searchPill }
             .animation(.appSpring, value: filtered)
             .navigationTitle("Platos")
             .navigationBarTitleDisplayMode(.inline)
@@ -101,6 +107,9 @@ struct DishesView: View {
                 let args = ProcessInfo.processInfo.arguments
                 if let i = args.firstIndex(of: "-screenshot"), i + 1 < args.count, args[i + 1] == "plato-editor" {
                     adding = true
+                }
+                if let i = args.firstIndex(of: "-screenshot"), i + 1 < args.count, args[i + 1] == "platos-busqueda" {
+                    query = "ensalada"
                 }
             }
         }
