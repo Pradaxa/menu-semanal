@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import WidgetKit
 
 // MARK: - Tab Ajustes
 
@@ -27,6 +28,7 @@ struct SettingsView: View {
                     backupCard
                     geminiCard
                     infoCard
+                    diagnosticsCard
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -197,6 +199,27 @@ struct SettingsView: View {
                         .foregroundStyle(Color.ink2(scheme))
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var diagnosticsCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Diagnóstico del widget 🛠️")
+                        .font(.headline)
+                    Spacer()
+                    Button("Actualizar widget") { WidgetCenter.shared.reloadAllTimelines() }
+                        .font(.caption)
+                }
+                Text("Grupo app: \(GroupDiagnostics.appResolved)")
+                Text("Grupo declarado (app): \(GroupDiagnostics.appDeclared.isEmpty ? "—" : GroupDiagnostics.appDeclared.joined(separator: ", "))")
+                Text("Grupo declarado (widget): \(GroupDiagnostics.widgetDeclared.isEmpty ? "—" : GroupDiagnostics.widgetDeclared.joined(separator: ", "))")
+                Text("Almacén compartido: \(GroupDiagnostics.storeIsShared ? "sí" : "no (respaldo local)")")
+            }
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(Color.ink2(scheme))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
     }

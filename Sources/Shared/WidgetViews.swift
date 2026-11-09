@@ -84,6 +84,11 @@ public struct MenuWidgetView: View {
                 .font(.system(size: 12))
                 .foregroundStyle(WidgetPalette.text(scheme).opacity(0.7))
                 .multilineTextAlignment(.center)
+            Text(SharedMenuReader.suiteName)
+                .font(.system(size: 8))
+                .foregroundStyle(WidgetPalette.text(scheme).opacity(0.35))
+                .lineLimit(1)
+                .truncationMode(.middle)
             Spacer()
         }
     }

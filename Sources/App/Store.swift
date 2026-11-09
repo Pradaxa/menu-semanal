@@ -16,7 +16,20 @@ final class AppStore: ObservableObject {
     /// nil = seguir al iPhone; true = oscuro; false = claro
     @Published var darkOverride: Bool? { didSet { persistStandard(darkOverride as Any, "menus.dark.v2") } }
 
-    private let suite = UserDefaults(suiteName: SharedMenuReader.suiteName)
+    /// Almacén de datos: el App Group compartido si está disponible y persiste;
+    /// si no, UserDefaults estándar para que los datos nunca desaparezcan.
+    static func workingSuite() -> UserDefaults {
+        if let s = UserDefaults(suiteName: SharedMenuReader.suiteName) {
+            let probe = "probe.\(UUID().uuidString)"
+            s.set(7, forKey: probe)
+            let ok = s.object(forKey: probe) != nil
+            s.removeObject(forKey: probe)
+            if ok { return s }
+        }
+        return .standard
+    }
+
+    private let suite = AppStore.workingSuite()
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -27,7 +40,14 @@ final class AppStore: ObservableObject {
             guard let data = defaults?.data(forKey: key) else { return nil }
             return try? JSONDecoder().decode(T.self, from: data)
         }
-        let suite = UserDefaults(suiteName: SharedMenuReader.suiteName)
+        let suite = self.suite
+        // Migración: si antes se guardó en estándar (grupo no disponible) y ahora sí lo está, copiamos.
+        if suite !== UserDefaults.standard, suite.data(forKey: "menus.dishes.v1") == nil,
+           UserDefaults.standard.data(forKey: "menus.dishes.v1") != nil {
+            for key in ["menus.dishes.v1", "menus.history.v1", "menus.drafts.v1", "menus.prefs.v1", "menus.shopping.v1", "menus.weeksel.v1"] {
+                if let v = UserDefaults.standard.object(forKey: key) { suite.set(v, forKey: key) }
+            }
+        }
         self.dishes = read([Dish].self, "menus.dishes.v1", from: suite) ?? AppStore.seedDishes()
         self.history = read([WeekMenu].self, "menus.history.v1", from: suite) ?? []
         self.drafts = read([DraftMenu].self, "menus.drafts.v1", from: suite) ?? []
@@ -41,7 +61,7 @@ final class AppStore: ObservableObject {
 
     private func persist<T: Encodable>(_ value: T, _ key: String) {
         guard let data = try? encoder.encode(value) else { return }
-        suite?.set(data, forKey: key)
+        suite.set(data, forKey: key)
     }
 
     private func persistStandard(_ value: Any, _ key: String) {
@@ -317,4 +337,28 @@ final class AppStore: ObservableObject {
         ]
         return seed.map { Dish(id: $0.0, name: $0.1, tags: $0.2, ingredients: $0.3) }
     }
+}
+
+// MARK: - Diagnóstico del App Group (visible en Ajustes)
+
+enum GroupDiagnostics {
+    /// Grupo que la app resolvió en tiempo de ejecución.
+    static var appResolved: String { SharedMenuReader.suiteName }
+
+    /// Grupos que AltStore declaró para la app al instalar (Info.plist ALTAppGroups).
+    static var appDeclared: [String] {
+        Bundle.main.infoDictionary?["ALTAppGroups"] as? [String] ?? []
+    }
+
+    /// Grupos que AltStore declaró para la extensión del widget.
+    static var widgetDeclared: [String] {
+        guard let plugins = Bundle.main.builtInPlugInsURL,
+              let items = try? FileManager.default.contentsOfDirectory(at: plugins, includingPropertiesForKeys: nil),
+              let appex = items.first(where: { $0.pathExtension == "appex" }),
+              let b = Bundle(url: appex) else { return [] }
+        return b.infoDictionary?["ALTAppGroups"] as? [String] ?? []
+    }
+
+    /// true si el almacén de datos es el App Group compartido (y no el respaldo estándar).
+    static var storeIsShared: Bool { AppStore.workingSuite() !== UserDefaults.standard }
 }

@@ -225,9 +225,18 @@ public enum SharedMenuReader {
     /// AltStore puede reasignar el ID al firmar con la cuenta del usuario; leyéndolo
     /// del binario firmado final, app y widget comparten siempre el mismo contenedor.
     public static var suiteName: String {
-        if let groups = embeddedAppGroups(), let first = groups.first, !first.isEmpty {
-            return first
+        // 1) Lo que AltStore escribio en el Info.plist de este bundle al instalar
+        //    (clave ALTAppGroups, con los IDs finales renombrados con el Team ID).
+        if let declared = Bundle.main.infoDictionary?["ALTAppGroups"] as? [String] {
+            if let match = declared.first(where: { $0.contains("menusemanal") }) { return match }
+            if let first = declared.first(where: { !$0.isEmpty }) { return first }
         }
+        // 2) Entitlements embebidos en el propio binario instalado.
+        if let groups = embeddedAppGroups(),
+           let match = groups.first(where: { $0.contains("menusemanal") }) ?? groups.first(where: { !$0.isEmpty }) {
+            return match
+        }
+        // 3) Respaldo: ID base (probablemente no concedido, pero inocuo).
         return fallbackSuiteName
     }
 

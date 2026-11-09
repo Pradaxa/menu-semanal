@@ -65,6 +65,8 @@ struct RootView: View {
             case "ajustes": tab = 3
             default: break
             }
+            // Al abrir la app, refrescamos el widget por si el timeline quedó viejo.
+            WidgetCenter.shared.reloadAllTimelines()
         }
     }
 }
