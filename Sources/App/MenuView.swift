@@ -20,6 +20,7 @@ struct MenuView: View {
 
     var body: some View {
         NavigationStack {
+            ScrollViewReader { scroll in
             ScrollView {
                 VStack(spacing: 14) {
                     weekNavigator
@@ -29,6 +30,7 @@ struct MenuView: View {
                     }
                     ForEach(0..<7, id: \.self) { day in
                         dayCard(day)
+                            .id(day)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -37,8 +39,15 @@ struct MenuView: View {
                 .animation(.appSpring, value: resolved.confirmed)
             }
             .background(AppBackground())
-            .navigationTitle("Menú")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .onAppear {
+                let args = ProcessInfo.processInfo.arguments
+                if let i = args.firstIndex(of: "-screenshot"), i + 1 < args.count, args[i + 1] == "menu-scroll" {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        scroll.scrollTo(2, anchor: .top)
+                    }
+                }
+            }
             .sheet(item: $slotPicker) { target in
                 SlotPickerSheet(day: target.day, meal: target.meal, weekKey: weekKey)
                     .environmentObject(store)
@@ -47,6 +56,7 @@ struct MenuView: View {
                 Button("Vale", role: .cancel) {}
             } message: {
                 Text(notice ?? "")
+            }
             }
         }
     }

@@ -67,7 +67,7 @@ jobs:
           mkdir -p shots
           for MODE in light dark; do
             xcrun simctl ui "$DEVICE" appearance $MODE
-            for SCREEN in menu platos platos-busqueda compra ajustes plato-editor widget-medium widget-large widget-small; do
+            for SCREEN in menu menu-scroll platos platos-busqueda compra ajustes plato-editor widget-medium widget-large widget-small; do
               xcrun simctl terminate "$DEVICE" "$BID" 2>/dev/null || true
               xcrun simctl launch "$DEVICE" "$BID" -screenshot $SCREEN >/dev/null 2>&1 || true
               sleep 5

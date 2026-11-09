@@ -59,7 +59,7 @@ struct RootView: View {
         }
         .onAppear {
             switch screenshotTarget {
-            case "menu": tab = 0
+            case "menu", "menu-scroll": tab = 0
             case "platos", "platos-busqueda": tab = 1
             case "compra": tab = 2
             case "ajustes": tab = 3
