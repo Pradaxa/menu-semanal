@@ -20,6 +20,24 @@
           "minOSVersion": "17.0"
         }
       ]
+    },
+    {
+      "name": "Qué ver",
+      "bundleIdentifier": "com.pradaxa.quever",
+      "developerName": "Pradaxa",
+      "localizedDescription": "Qué ver esta noche: busca películas y series, mira en qué plataforma están y lleva tu lista de pendientes y vistas.",
+      "iconURL": "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/icon-quever.png",
+      "tintColor": "C9574A",
+      "versions": [
+        {
+          "version": "0.1.5",
+          "buildVersion": "5",
+          "date": "2026-11-09T07:55:19Z",
+          "downloadURL": "https://github.com/Pradaxa/menu-semanal/releases/download/qv-0.1.5/QueVer.ipa",
+          "size": 1863018,
+          "minOSVersion": "17.0"
+        }
+      ]
     }
   ]
 }
