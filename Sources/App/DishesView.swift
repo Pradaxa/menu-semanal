@@ -96,6 +96,13 @@ struct DishesView: View {
                 DishEditorSheet(dish: Dish(id: "", name: ""), isNew: true)
                     .environmentObject(store)
             }
+            .onAppear {
+                // Captura de CI: -screenshot plato-editor abre la hoja de nuevo plato
+                let args = ProcessInfo.processInfo.arguments
+                if let i = args.firstIndex(of: "-screenshot"), i + 1 < args.count, args[i + 1] == "plato-editor" {
+                    adding = true
+                }
+            }
         }
     }
 
@@ -240,7 +247,10 @@ struct DishEditorSheet: View {
                         }
                         .buttonStyle(MagicButtonStyle())
                         .disabled(working || dish.name.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .listRowBackground(Color.clear)
+                        // Sin listRowBackground personalizado: con Color.clear, iOS 26
+                        // saca la fila de la tarjeta de la sección y el borde inferior
+                        // de la tarjeta queda cortado.
+                        .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                     }
                 } header: {
                     Text("Ingredientes")

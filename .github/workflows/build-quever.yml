@@ -1,0 +1,152 @@
+name: build-quever-ios
+
+on:
+  push:
+    branches: [main]
+    paths: ['quever/**', '.github/workflows/build-quever.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: quever
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Generate project
+        run: xcodegen
+
+      - name: Simulator build + pruebas + capturas
+        run: |
+          set -e
+          xcodebuild \
+            -project QueVer.xcodeproj \
+            -scheme QueVer \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build-sim \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          DEVICE=$(xcrun simctl list devices available -j | jq -r '[.devices | to_entries[] | select(.key | test("iOS")) | .value[] | select(.name | test("iPhone"))] | sort_by(.name) | .[-1].udid')
+          xcrun simctl boot "$DEVICE" || true
+          xcrun simctl bootstatus "$DEVICE" -b
+          APP=$(find build-sim/Build/Products/Debug-iphonesimulator -maxdepth 1 -name "QueVer.app")
+          xcrun simctl install "$DEVICE" "$APP"
+          BID=com.pradaxa.quever
+          echo "== Selftest =="
+          xcrun simctl launch --console-pty "$DEVICE" "$BID" -selftest 2>&1 | tee selftest.log | grep SELFTEST || true
+          sleep 2
+          if grep -q "SELFTEST-FAIL" selftest.log || ! grep -q "SELFTEST-PASS all" selftest.log; then
+            echo "Hay pruebas fallidas o el selftest no terminó"
+            exit 1
+          fi
+          mkdir -p shots
+          for MODE in light dark; do
+            xcrun simctl ui "$DEVICE" appearance $MODE
+            for SCREEN in buscar top lista ajustes; do
+              xcrun simctl terminate "$DEVICE" "$BID" 2>/dev/null || true
+              xcrun simctl launch "$DEVICE" "$BID" -screenshot $SCREEN >/dev/null 2>&1 || true
+              sleep 5
+              xcrun simctl io "$DEVICE" screenshot "shots/${MODE}-${SCREEN}.png" || true
+            done
+          done
+          ls -la shots/
+
+      - name: Subir capturas
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-quever
+          path: quever/shots/
+          if-no-files-found: ignore
+
+      - name: Build IPA (unsigned)
+        run: |
+          xcodebuild \
+            -project QueVer.xcodeproj \
+            -scheme QueVer \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            MARKETING_VERSION="0.1.${{ github.run_number }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            build
+
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -R "build/Build/Products/Release-iphoneos/QueVer.app" Payload/
+          zip -r -q QueVer.ipa Payload
+          ls -lh QueVer.ipa
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="qv-0.1.${{ github.run_number }}"
+          gh release create "$TAG" QueVer.ipa \
+            --title "Qué ver 0.1.${{ github.run_number }}" \
+            --notes "Build automática ${{ github.run_number }}"
+          # GitHub a veces deja el asset roto (504 aunque la subida dijo OK): verificamos y re-subimos
+          for i in 1 2 3 4 5; do
+            if curl -sfL -o /dev/null "https://github.com/Pradaxa/menu-semanal/releases/download/$TAG/QueVer.ipa"; then
+              echo "Asset público descargable OK"
+              break
+            fi
+            echo "Asset no descargable (intento $i), re-subiendo"
+            gh release upload "$TAG" QueVer.ipa --clobber
+            sleep 10
+            if [ "$i" = 5 ]; then
+              echo "El asset sigue sin ser descargable tras 5 intentos"
+              exit 1
+            fi
+          done
+
+      - name: Update AltStore source
+        run: |
+          TAG="qv-0.1.${{ github.run_number }}"
+          VER="0.1.${{ github.run_number }}"
+          BUILD="${{ github.run_number }}"
+          SIZE=$(stat -f%z QueVer.ipa)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          NEWAPP=$(jq -n \
+            --arg ver "$VER" --arg build "$BUILD" --arg date "$DATE" --argjson size "$SIZE" \
+            --arg url "https://github.com/Pradaxa/menu-semanal/releases/download/$TAG/QueVer.ipa" \
+            '{
+              name: "Qué ver",
+              bundleIdentifier: "com.pradaxa.quever",
+              developerName: "Pradaxa",
+              localizedDescription: "Qué ver esta noche: busca películas y series, mira en qué plataforma están y lleva tu lista de pendientes y vistas.",
+              iconURL: "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/icon-quever.png",
+              tintColor: "C9574A",
+              versions: [{
+                version: $ver,
+                buildVersion: $build,
+                date: $date,
+                downloadURL: $url,
+                size: $size,
+                minOSVersion: "17.0"
+              }]
+            }')
+          # Conserva las demás apps de la fuente (p. ej. Menú) y actualiza solo esta
+          jq --argjson app "$NEWAPP" \
+            '.apps = ([.apps[]? | select(.bundleIdentifier != "com.pradaxa.quever")] + [$app])' \
+            ../altstore/source.json > ../altstore/source.json.tmp && mv ../altstore/source.json.tmp ../altstore/source.json
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add altstore/source.json
+          git commit -m "AltStore source Qué ver $TAG [skip ci]" || echo "sin cambios"
+          git pull --rebase
+          git push

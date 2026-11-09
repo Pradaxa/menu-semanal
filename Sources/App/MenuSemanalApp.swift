@@ -63,6 +63,7 @@ struct RootView: View {
             case "platos": tab = 1
             case "compra": tab = 2
             case "ajustes": tab = 3
+            case "plato-editor": tab = 1
             default: break
             }
             // Al abrir la app, refrescamos el widget por si el timeline quedó viejo.

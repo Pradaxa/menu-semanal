@@ -3,6 +3,7 @@ name: build-ios
 on:
   push:
     branches: [main]
+    paths: ['Sources/**', 'Entitlements/**', 'project.yml', '.github/workflows/build.yml']
   workflow_dispatch:
 
 permissions:
@@ -61,7 +62,7 @@ jobs:
           mkdir -p shots
           for MODE in light dark; do
             xcrun simctl ui "$DEVICE" appearance $MODE
-            for SCREEN in menu platos compra ajustes widget-medium widget-large widget-small; do
+            for SCREEN in menu platos compra ajustes plato-editor widget-medium widget-large widget-small; do
               xcrun simctl terminate "$DEVICE" "$BID" 2>/dev/null || true
               xcrun simctl launch "$DEVICE" "$BID" -screenshot $SCREEN >/dev/null 2>&1 || true
               sleep 5
@@ -141,32 +142,32 @@ jobs:
           BUILD="${{ github.run_number }}"
           SIZE=$(stat -f%z MenuSemanal.ipa)
           DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          jq -n \
+          NEWAPP=$(jq -n \
             --arg ver "$VER" --arg build "$BUILD" --arg date "$DATE" --argjson size "$SIZE" \
             --arg url "https://github.com/Pradaxa/menu-semanal/releases/download/$TAG/MenuSemanal.ipa" \
             '{
-              name: "Menú Semanal",
-              identifier: "com.pradaxa.menusemanal.source",
-              sourceURL: "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/source.json",
-              apps: [{
-                name: "Menú",
-                bundleIdentifier: "com.pradaxa.menusemanal",
-                developerName: "Pradaxa",
-                localizedDescription: "Tu menú semanal con widget para la pantalla de inicio.",
-                iconURL: "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/icon.png",
-                tintColor: "34C759",
-                versions: [{
-                  version: $ver,
-                  buildVersion: $build,
-                  date: $date,
-                  downloadURL: $url,
-                  size: $size,
-                  minOSVersion: "17.0"
-                }]
+              name: "Menú",
+              bundleIdentifier: "com.pradaxa.menusemanal",
+              developerName: "Pradaxa",
+              localizedDescription: "Tu menú semanal con widget para la pantalla de inicio.",
+              iconURL: "https://raw.githubusercontent.com/Pradaxa/menu-semanal/main/altstore/icon.png",
+              tintColor: "34C759",
+              versions: [{
+                version: $ver,
+                buildVersion: $build,
+                date: $date,
+                downloadURL: $url,
+                size: $size,
+                minOSVersion: "17.0"
               }]
-            }' > altstore/source.json
+            }')
+          # Conserva las demás apps de la fuente (p. ej. Qué ver) y actualiza solo esta
+          jq --argjson app "$NEWAPP" \
+            '.apps = ([.apps[]? | select(.bundleIdentifier != "com.pradaxa.menusemanal")] + [$app])' \
+            altstore/source.json > altstore/source.json.tmp && mv altstore/source.json.tmp altstore/source.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add altstore/source.json
           git commit -m "AltStore source $TAG [skip ci]" || echo "sin cambios"
+          git pull --rebase
           git push
