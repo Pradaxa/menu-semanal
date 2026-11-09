@@ -23,6 +23,11 @@ struct MenuView: View {
             ScrollViewReader { scroll in
             ScrollView {
                 VStack(spacing: 14) {
+                    Text("Menú semanal")
+                        .font(.system(size: 28, weight: .semibold, design: .serif))
+                        .foregroundStyle(Color.ink(scheme))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
                     weekNavigator
                     actionButtons
                     if resolved.menu.slots.isEmpty && !resolved.confirmed {
