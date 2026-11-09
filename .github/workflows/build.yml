@@ -174,7 +174,7 @@ jobs:
                 minOSVersion: "17.0"
               }]
             }')
-          # Conserva las demás apps de la fuente (p. ej. Qué ver) y actualiza solo esta
+          # Actualiza la entrada de Menú y conserva otras entradas existentes
           jq --argjson app "$NEWAPP" \
             '.apps = ([.apps[]? | select(.bundleIdentifier != "com.pradaxa.menusemanal")] + [$app])' \
             altstore/source.json > altstore/source.json.tmp && mv altstore/source.json.tmp altstore/source.json
