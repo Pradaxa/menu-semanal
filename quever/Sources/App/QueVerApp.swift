@@ -34,6 +34,10 @@ struct SelfTestRunnerView: View {
             .onAppear {
                 let ok = SelfTest.run()
                 print(ok ? "SELFTEST-PASS all" : "SELFTEST-FAIL some")
+                fflush(stdout)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    exit(ok ? 0 : 1)
+                }
             }
     }
 }
