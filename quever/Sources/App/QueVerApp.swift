@@ -62,6 +62,7 @@ struct RootView: View {
                     .tag(3)
             }
             .tint(Color.accentScheme(scheme))
+            ToastOverlay()
         }
         .onAppear {
             switch screenshotTarget {

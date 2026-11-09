@@ -111,25 +111,16 @@ struct ListaView: View {
             GlassCard {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(list.prefix(pendShown)), id: \.id) { item in
-                        Button { selected = item } label: {
+                        SwipeRow(onTap: { selected = item },
+                                 onVista: {
+                                     let msg = store.mark(.vista, item)
+                                     ToastCenter.shared.show(msg)
+                                 },
+                                 onDelete: {
+                                     store.removeEverywhere(item.id)
+                                     ToastCenter.shared.show("Quitada de pendientes")
+                                 }) {
                             TitleRow(item: item)
-                                .padding(.horizontal, 0)
-                        }
-                        .buttonStyle(SilentButtonStyle())
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) {
-                                store.removeEverywhere(item.id)
-                                ToastCenter.shared.show("Quitada de pendientes")
-                            } label: {
-                                Label("Quitar", systemImage: "trash")
-                            }
-                            Button {
-                                let msg = store.mark(.vista, item)
-                                ToastCenter.shared.show(msg)
-                            } label: {
-                                Label("Vista", systemImage: "checkmark")
-                            }
-                            .tint(Color.accentScheme(scheme))
                         }
                         if item.id != list.prefix(pendShown).last?.id { Divider().opacity(0.3) }
                     }

@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: quever-ios
+  cancel-in-progress: true
+
 jobs:
   ios:
     runs-on: macos-latest

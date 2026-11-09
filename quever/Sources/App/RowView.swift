@@ -236,3 +236,89 @@ struct ToastOverlay: View {
         }
     }
 }
+
+// MARK: - Fila deslizable (como la web: desliza a la izquierda y aparecen ✓ y 🗑)
+
+struct SwipeRow<Content: View>: View {
+    let onTap: () -> Void
+    let onVista: () -> Void
+    let onDelete: () -> Void
+    let content: Content
+    @Environment(\.colorScheme) private var scheme
+
+    @State private var offset: CGFloat = 0
+    @State private var start: CGFloat = 0
+    @State private var active = false
+    private let open: CGFloat = 140
+
+    init(onTap: @escaping () -> Void, onVista: @escaping () -> Void, onDelete: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+        self.onTap = onTap
+        self.onVista = onVista
+        self.onDelete = onDelete
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            HStack(spacing: 8) {
+                Button {
+                    withAnimation(.appSpring) { offset = 0 }
+                    onVista()
+                } label: {
+                    Text("✓")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.accentScheme(scheme)))
+                }
+                .buttonStyle(SilentButtonStyle())
+                Button {
+                    withAnimation(.appSpring) { offset = 0 }
+                    onDelete()
+                } label: {
+                    Text("🗑")
+                        .font(.system(size: 17))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Color.qvRed.opacity(0.9)))
+                }
+                .buttonStyle(SilentButtonStyle())
+            }
+            .opacity(offset < -20 ? 1 : 0)
+
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(scheme == .dark ? Color(red: 0.145, green: 0.125, blue: 0.125) : Color.white.opacity(0.95))
+                        .opacity(offset < -4 ? 1 : 0)
+                )
+                .contentShape(Rectangle())
+                .offset(x: offset)
+                .gesture(
+                    DragGesture(minimumDistance: 12)
+                        .onChanged { value in
+                            guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                            if !active { active = true; start = offset }
+                            var x = start + value.translation.width
+                            if x > 0 { x = x * 0.35 }
+                            if x < -open { x = -open + (x + open) * 0.35 }
+                            offset = x
+                        }
+                        .onEnded { _ in
+                            active = false
+                            withAnimation(.appSpring) {
+                                offset = offset < -open / 2 ? -open : 0
+                            }
+                        }
+                )
+                .onTapGesture {
+                    if offset != 0 {
+                        withAnimation(.appSpring) { offset = 0 }
+                    } else {
+                        onTap()
+                    }
+                }
+        }
+        .clipped()
+    }
+}
