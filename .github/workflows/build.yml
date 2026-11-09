@@ -118,6 +118,21 @@ jobs:
           gh release create "$TAG" MenuSemanal.ipa \
             --title "Menú $TAG" \
             --notes "Build automática ${{ github.run_number }}"
+          # GitHub a veces deja el asset roto (504 en la URL pública aunque la subida dijo OK).
+          # Verificamos la descarga pública y re-subimos si hace falta.
+          for i in 1 2 3 4 5; do
+            if curl -sfL -o /dev/null "https://github.com/Pradaxa/menu-semanal/releases/download/$TAG/MenuSemanal.ipa"; then
+              echo "Asset público descargable OK"
+              break
+            fi
+            echo "Asset no descargable (intento $i), re-subiendo"
+            gh release upload "$TAG" MenuSemanal.ipa --clobber
+            sleep 10
+            if [ "$i" = 5 ]; then
+              echo "El asset sigue sin ser descargable tras 5 intentos"
+              exit 1
+            fi
+          done
 
       - name: Update AltStore source
         run: |
