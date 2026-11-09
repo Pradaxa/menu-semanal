@@ -107,6 +107,7 @@ struct BuscarView: View {
                         Text("Preguntar a Gemini ✨")
                     }
                     .buttonStyle(MagicButtonStyle())
+                    .disabled(store.geminiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     pastePanel
                 }
             }

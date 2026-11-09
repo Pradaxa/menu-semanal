@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths: ['Sources/**', 'Entitlements/**', 'project.yml', '.github/workflows/build.yml']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publicar solo con aprobación del usuario
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -111,7 +116,14 @@ jobs:
           zip -r -q MenuSemanal.ipa Payload
           ls -lh MenuSemanal.ipa
 
+      - name: Guardar IPA preparada
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-ipa-preparada
+          path: MenuSemanal.ipa
+
       - name: Publish release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -136,6 +148,7 @@ jobs:
           done
 
       - name: Update AltStore source
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
         run: |
           TAG="v0.3.${{ github.run_number }}"
           VER="0.3.${{ github.run_number }}"
