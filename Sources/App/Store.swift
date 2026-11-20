@@ -6,12 +6,14 @@ import WidgetKit
 
 final class AppStore: ObservableObject {
     @Published var dishes: [Dish] { didSet { persist(dishes, "menus.dishes.v1"); refreshWidget() } }
-    @Published var history: [WeekMenu] { didSet { persist(history, "menus.history.v1"); refreshWidget() } }
-    @Published var drafts: [DraftMenu] { didSet { persist(drafts, "menus.drafts.v1"); refreshWidget() } }
+    @Published var history: [WeekMenu] { didSet { persist(history, "menus.history.v1"); refreshWidget(); MenuSync.schedulePush(store: self) } }
+    @Published var drafts: [DraftMenu] { didSet { persist(drafts, "menus.drafts.v1"); refreshWidget(); MenuSync.schedulePush(store: self) } }
     @Published var learning: Learning { didSet { persist(learning, "menus.prefs.v1") } }
     @Published var shopping: ShoppingState { didSet { persist(shopping, "menus.shopping.v1") } }
     @Published var weekSel: String { didSet { persist(weekSel, "menus.weeksel.v1") } }
     @Published var geminiKey: String { didSet { persistStandard(geminiKey, "menus.gemini.v1") } }
+    @Published var syncKey: String { didSet { persistStandard(syncKey, "menus.synckey.v1") } }
+    @Published var lastSync: String { didSet { persistStandard(lastSync, "menus.lastsync.v1") } }
 
     /// nil = seguir al iPhone; true = oscuro; false = claro
     @Published var darkOverride: Bool? { didSet { persistStandard(darkOverride as Any, "menus.dark.v2") } }
@@ -56,6 +58,8 @@ final class AppStore: ObservableObject {
         self.weekSel = read(String.self, "menus.weeksel.v1", from: suite) ?? Week.currentKey
         let std = UserDefaults.standard
         self.geminiKey = std.string(forKey: "menus.gemini.v1") ?? ""
+        self.syncKey = std.string(forKey: "menus.synckey.v1") ?? ""
+        self.lastSync = std.string(forKey: "menus.lastsync.v1") ?? ""
         self.darkOverride = std.object(forKey: "menus.dark.v2") as? Bool
     }
 

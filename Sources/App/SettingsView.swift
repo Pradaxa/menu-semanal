@@ -27,6 +27,7 @@ struct SettingsView: View {
                     learningCard
                     backupCard
                     geminiCard
+                    syncCard
                     infoCard
                     diagnosticsCard
                 }
@@ -150,6 +151,41 @@ struct SettingsView: View {
                 }
             case .failure:
                 break
+            }
+        }
+    }
+
+    private var syncCard: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Enviar a Mi Día 🍽️")
+                    .font(.headline)
+                Text("Tu web Mi Día puede mostrar lo que toca comer hoy. Pega la clave que te han pasado y la app subirá el menú de esta semana y la que viene cada vez que cambie algo. La clave solo se guarda en este iPhone.")
+                    .font(.callout)
+                    .foregroundStyle(Color.ink2(scheme))
+                SecureField("Pega la clave de Mi Día", text: $store.syncKey)
+                    .textContentType(.password)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                HStack {
+                    Button {
+                        MenuSync.push(store: store)
+                    } label: {
+                        Text("Enviar ahora")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Color.tealScheme(scheme))
+                    .disabled(store.syncKey.trimmingCharacters(in: .whitespaces).isEmpty)
+                    if !store.syncKey.isEmpty {
+                        Button("Quitar", role: .destructive) { store.syncKey = "" }
+                            .font(.callout)
+                    }
+                }
+                if !store.lastSync.isEmpty {
+                    Text("Último envío: \(store.lastSync)")
+                        .font(.caption)
+                        .foregroundStyle(Color.ink2(scheme))
+                }
             }
         }
     }
