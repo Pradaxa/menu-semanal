@@ -1,9 +1,10 @@
 import Foundation
 
 // MARK: - Sync con Mi Día (mi-dia-hub.pages.dev)
-// Sube el menú visible (borrador si existe, si no el confirmado) de esta semana
-// y la siguiente al endpoint de Mi Día, cada vez que cambia. La clave la pega el
-// usuario en Ajustes y solo se guarda en este iPhone.
+// Sube SOLO el menú CONFIRMADO de esta semana y la siguiente al endpoint de
+// Mi Día, cada vez que cambia. Un borrador sin confirmar no se sube: si la
+// semana en curso no está confirmada, Mi Día muestra "Menú pendiente de
+// confirmar". La clave la pega el usuario en Ajustes y solo se guarda aquí.
 
 enum MenuSync {
     static let endpoint = URL(string: "https://mi-dia-hub.pages.dev/api/menu")!
@@ -26,11 +27,11 @@ enum MenuSync {
         let key = store.syncKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
         let keys = [Week.currentKey, Week.add(1, to: Week.currentKey)]
-        let weeks = keys.map { k -> SyncWeek in
-            let r = store.resolved(k)
+        let weeks = keys.compactMap { k -> SyncWeek? in
+            guard let h = store.history.first(where: { $0.weekKey == k }), (h.confirmed ?? false) else { return nil }
             let days = (0..<7).map { day -> SyncDay in
                 func title(_ meal: String) -> String {
-                    guard let s = r.menu.slots.first(where: { $0.day == day && $0.meal == meal }) else { return "" }
+                    guard let s = h.slots.first(where: { $0.day == day && $0.meal == meal }) else { return "" }
                     return store.slotTitle(s.dishId)
                 }
                 return SyncDay(day: day, comida: title("comida"), cena: title("cena"))
