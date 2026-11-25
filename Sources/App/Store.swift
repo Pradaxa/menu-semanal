@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import WidgetKit
 
 // MARK: - Tienda principal
@@ -150,6 +151,22 @@ final class AppStore: ObservableObject {
     func generate(fillOnly: Bool, in weekKey: String, useAI: Bool,
                   progress: ((Double, String) -> Void)? = nil,
                   completion: @escaping (String?) -> Void) {
+        // Vida extra al salir de la app (~30 s, lo decide iOS, no configurable):
+        // da tiempo a terminar la generación si el usuario cambia de app un momento.
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask {
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+        }
+        let done: (String?) -> Void = { warning in
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+            completion(warning)
+        }
         let current = resolved(weekKey)
         let fixed: [Slot]
         if fillOnly {
@@ -171,7 +188,7 @@ final class AppStore: ObservableObject {
             }
             DispatchQueue.main.async {
                 self.saveDraft(m, orig: m.slots, base: "fresh")
-                completion(warning)
+                done(warning)
             }
         }
 
@@ -188,7 +205,7 @@ final class AppStore: ObservableObject {
                 } catch {
                     if fillOnly {
                         DispatchQueue.main.async {
-                            completion((error as NSError).localizedDescription + " No se ha cambiado ningún plato.")
+                            done((error as NSError).localizedDescription + " No se ha cambiado ningún plato.")
                         }
                     } else {
                         let menu = Engine.generate(dishes: dishes, history: history, weekKey: weekKey,
