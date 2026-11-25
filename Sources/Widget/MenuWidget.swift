@@ -51,5 +51,6 @@ struct WidgetContainerBackground: View {
 struct MenuWidgetBundle: WidgetBundle {
     var body: some Widget {
         MenuWidget()
+        GenLiveActivity()
     }
 }

@@ -1,3 +1,4 @@
+import ActivityKit
 import Foundation
 
 // MARK: - Pruebas automáticas de lógica (CI): se lanzan con -selftest y escriben SELFTEST-* por consola
@@ -152,6 +153,25 @@ enum SelfTest {
         check("retrydelay-capped", Gemini.parseRetryDelay(bodyBig) == 45)
         check("retrydelay-nil", Gemini.parseRetryDelay(Data("{}".utf8)) == nil)
         check("fingerprint-stable", Gemini.keyFingerprint("abc") == Gemini.keyFingerprint("abc") && Gemini.keyFingerprint("abc") != Gemini.keyFingerprint("abd"))
+
+        // 16. Live Activity: arranca, acepta una actualización y cierra
+        let laSem = DispatchSemaphore(value: 0)
+        var laStarted = false
+        var laEnded = false
+        Task {
+            LiveProgress.start()
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            laStarted = !Activity<GenActivityAttributes>.activities.isEmpty
+            LiveProgress.update(0.5, "Probando la actividad…")
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            LiveProgress.cancel()
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            laEnded = Activity<GenActivityAttributes>.activities.isEmpty
+            laSem.signal()
+        }
+        _ = laSem.wait(timeout: .now() + 15)
+        check("live-activity-arranca", laStarted)
+        check("live-activity-cierra", laEnded)
 
         if failures.isEmpty {
             print("SELFTEST-PASS all")

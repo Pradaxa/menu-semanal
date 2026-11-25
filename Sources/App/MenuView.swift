@@ -223,13 +223,16 @@ struct MenuView: View {
         aiMode = !store.geminiKey.isEmpty
         aiProgress = 0
         aiStage = ""
+        if aiMode { LiveProgress.start() }
         store.generate(fillOnly: fillOnly, in: weekKey, useAI: aiMode,
                        progress: { p, m in
                            aiProgress = p
                            aiStage = m
+                           LiveProgress.update(p, m)
                        },
                        completion: { warning in
                            generating = false
+                           if warning == nil { LiveProgress.finish() } else { LiveProgress.cancel() }
                            if let warning = warning { notice = warning }
                        })
     }

@@ -40,6 +40,8 @@ struct RootView: View {
         Group {
             if let target = screenshotTarget, target.hasPrefix("widget-") {
                 WidgetPreviewScreen(family: target)
+            } else if screenshotTarget == "liveactivity" {
+                LiveActivityPreviewScreen()
             } else {
                 TabView(selection: $tab) {
                     MenuView()
@@ -132,4 +134,24 @@ struct WidgetPreviewScreen: View {
         WidgetDay(dayIndex: 5, lunch: "Comer fuera", dinner: "Pollo en pita"),
         WidgetDay(dayIndex: 6, lunch: "Codillo al horno", dinner: "Sobras"),
     ]
+}
+
+/// Vista previa de la Live Activity a tamaño real, solo para capturas de CI
+struct LiveActivityPreviewScreen: View {
+    @Environment(\.colorScheme) private var scheme
+
+    var body: some View {
+        ZStack {
+            AppBackground()
+            VStack(spacing: 24) {
+                Text("Así se verá en la pantalla de bloqueo")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                GenActivityBanner(progress: 0.45, stage: "Generando con la IA…")
+                    .background(.regularMaterial,
+                                in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .padding(.horizontal, 16)
+            }
+        }
+    }
 }
