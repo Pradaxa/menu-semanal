@@ -7,6 +7,9 @@ struct MenuView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var slotPicker: SlotTarget?
     @State private var generating = false
+    @State private var aiMode = false
+    @State private var aiProgress: Double = 0
+    @State private var aiStage = ""
     @State private var notice: String?
 
     struct SlotTarget: Identifiable {
@@ -51,6 +54,12 @@ struct MenuView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         scroll.scrollTo(2, anchor: .top)
                     }
+                }
+                if let i = args.firstIndex(of: "-screenshot"), i + 1 < args.count, args[i + 1] == "menu-progreso" {
+                    generating = true
+                    aiMode = true
+                    aiProgress = 0.45
+                    aiStage = "Límite por minuto de Google. Reintento en 12 s…"
                 }
             }
             .sheet(item: $slotPicker) { target in
@@ -180,21 +189,49 @@ struct MenuView: View {
             }
         }
         if generating {
-            HStack(spacing: 8) {
-                ProgressView()
-                Text(store.geminiKey.isEmpty ? "Generando con tus reglas…" : "Pensando con IA…")
-                    .font(.callout)
-                    .foregroundStyle(Color.ink2(scheme))
+            if aiMode {
+                GlassCard {
+                    VStack(spacing: 8) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(aiStage.isEmpty ? "Preparando…" : aiStage)
+                                .font(.callout)
+                                .foregroundStyle(Color.ink2(scheme))
+                                .lineLimit(2)
+                            Spacer(minLength: 8)
+                            Text("\(Int((aiProgress * 100).rounded()))%")
+                                .font(.callout.bold().monospacedDigit())
+                                .foregroundStyle(Color.ink(scheme))
+                        }
+                        ProgressView(value: aiProgress, total: 1)
+                            .tint(Color.tealScheme(scheme))
+                    }
+                }
+                .transition(.opacity)
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Generando con tus reglas…")
+                        .font(.callout)
+                        .foregroundStyle(Color.ink2(scheme))
+                }
             }
         }
     }
 
     private func runGenerate(fillOnly: Bool) {
         generating = true
-        store.generate(fillOnly: fillOnly, in: weekKey, useAI: !store.geminiKey.isEmpty) { warning in
-            generating = false
-            if let warning = warning { notice = warning }
-        }
+        aiMode = !store.geminiKey.isEmpty
+        aiProgress = 0
+        aiStage = ""
+        store.generate(fillOnly: fillOnly, in: weekKey, useAI: aiMode,
+                       progress: { p, m in
+                           aiProgress = p
+                           aiStage = m
+                       },
+                       completion: { warning in
+                           generating = false
+                           if let warning = warning { notice = warning }
+                       })
     }
 
     private func dayCard(_ day: Int) -> some View {

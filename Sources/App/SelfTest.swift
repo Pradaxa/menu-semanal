@@ -137,6 +137,22 @@ enum SelfTest {
             check("appgroup-persists", false)
         }
 
+        // 15. Gemini: orden de modelos (mejor primero), candidatos y retryDelay
+        let ranked = Gemini.rankModels(["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-9.9-pro-preview"])
+        check("rank-pro-first", ranked.first == "gemini-2.5-pro")
+        check("rank-lite-last", ranked.last == "gemini-2.5-flash-lite")
+        check("rank-preview-penalty", Gemini.rankModels(["gemini-2.5-pro-preview", "gemini-2.5-pro"]).first == "gemini-2.5-pro")
+        let cand = Gemini.candidateOrder(models: ["a-pro", "b-flash", "c-flash", "d-lite"], lastGood: "c-flash", limit: 3)
+        check("candidates-best-first", cand == ["a-pro", "c-flash", "b-flash"])
+        let cand2 = Gemini.candidateOrder(models: ["a-pro", "b-flash"], lastGood: "a-pro", limit: 3)
+        check("candidates-lastgood-first-ok", cand2 == ["a-pro", "b-flash"])
+        let body = #"{"error":{"code":429,"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"23.5s"}]}}"#.data(using: .utf8)!
+        check("retrydelay-parsed", Gemini.parseRetryDelay(body) == 23.5)
+        let bodyBig = #"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"300s"}]}}"#.data(using: .utf8)!
+        check("retrydelay-capped", Gemini.parseRetryDelay(bodyBig) == 45)
+        check("retrydelay-nil", Gemini.parseRetryDelay(Data("{}".utf8)) == nil)
+        check("fingerprint-stable", Gemini.keyFingerprint("abc") == Gemini.keyFingerprint("abc") && Gemini.keyFingerprint("abc") != Gemini.keyFingerprint("abd"))
+
         if failures.isEmpty {
             print("SELFTEST-PASS all")
         } else {

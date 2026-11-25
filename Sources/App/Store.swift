@@ -147,7 +147,9 @@ final class AppStore: ObservableObject {
     }
 
     /// Genera un menú (fillOnly = solo huecos, respeta lo puesto)
-    func generate(fillOnly: Bool, in weekKey: String, useAI: Bool, completion: @escaping (String?) -> Void) {
+    func generate(fillOnly: Bool, in weekKey: String, useAI: Bool,
+                  progress: ((Double, String) -> Void)? = nil,
+                  completion: @escaping (String?) -> Void) {
         let current = resolved(weekKey)
         let fixed: [Slot]
         if fillOnly {
@@ -174,10 +176,14 @@ final class AppStore: ObservableObject {
         }
 
         if useAI && !key.isEmpty {
+            let progressMain: ((Double, String) -> Void)? = progress.map { cb in
+                { p, m in DispatchQueue.main.async { cb(p, m) } }
+            }
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let menu = try Gemini.generateMenu(apiKey: key, dishes: dishes, history: history,
-                                                       learning: learning, weekKey: weekKey, fixed: fixed)
+                                                       learning: learning, weekKey: weekKey, fixed: fixed,
+                                                       progress: progressMain)
                     finish(menu, nil)
                 } catch {
                     if fillOnly {

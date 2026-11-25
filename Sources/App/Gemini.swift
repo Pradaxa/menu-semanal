@@ -6,6 +6,7 @@ enum GeminiError: LocalizedError {
     case noKey
     case connection(String)
     case http(Int, String)
+    case rateLimited(String, Double?)
     case invalidJSON(String)
     case noModels
 
@@ -14,6 +15,7 @@ enum GeminiError: LocalizedError {
         case .noKey: return "Pega tu clave de Gemini en Ajustes."
         case .connection(let m): return m
         case .http(let code, let what): return "\(what): error HTTP \(code)."
+        case .rateLimited(let model, _): return "\(model): error HTTP 429."
         case .invalidJSON(let model): return "\(model): JSON inválido"
         case .noModels: return "models.list respondió, pero no anuncia ningún modelo Gemini de texto con generateContent para esta clave."
         }
@@ -22,6 +24,80 @@ enum GeminiError: LocalizedError {
 
 enum Gemini {
     private static var modelCache: (key: String, at: Date, names: [String])?
+    private static let modelsUDKey = "gemini.models.v2"
+    private static let lastGoodUDKey = "gemini.lastgood.v1"
+    private static let modelsTTL: TimeInterval = 24 * 3600
+
+    /// Huella FNV-1a de la clave, para no guardar la clave en UserDefaults
+    static func keyFingerprint(_ key: String) -> String {
+        var h: UInt64 = 1469598103934665603
+        for b in key.utf8 {
+            h ^= UInt64(b)
+            h = h &* 1099511628211
+        }
+        return String(h, radix: 16)
+    }
+
+    /// Ordena los modelos de mejor a peor: pro > flash > flash-lite; estable antes que preview
+    static func rankModels(_ names: [String]) -> [String] {
+        func rank(_ name: String) -> Int {
+            var r = 50
+            if name.contains("pro") { r = 0 }
+            else if name.contains("flash-lite") { r = 20 }
+            else if name.contains("flash") { r = 10 }
+            if name.contains("preview") || name.contains("exp") { r += 5 }
+            return r
+        }
+        return names.sorted { a, b in
+            if rank(a) != rank(b) { return rank(a) < rank(b) }
+            return a.compare(b, options: .numeric) == .orderedDescending
+        }
+    }
+
+    /// Candidatos a probar: siempre primero el mejor disponible;
+    /// el último que funcionó va segundo como respaldo rápido.
+    static func candidateOrder(models: [String], lastGood: String?, limit: Int) -> [String] {
+        var ordered = models
+        if let last = lastGood, let i = ordered.firstIndex(of: last), i > 0 {
+            ordered.remove(at: i)
+            if ordered.count > 1 { ordered.insert(last, at: 1) }
+        }
+        return Array(ordered.prefix(limit))
+    }
+
+    static var lastGoodModel: String? {
+        get { UserDefaults.standard.string(forKey: lastGoodUDKey) }
+        set { UserDefaults.standard.set(newValue, forKey: lastGoodUDKey) }
+    }
+
+    private static func persistModels(_ names: [String], for key: String) {
+        UserDefaults.standard.set(["hash": keyFingerprint(key),
+                                   "at": Date().timeIntervalSince1970,
+                                   "names": names] as [String: Any], forKey: modelsUDKey)
+    }
+
+    private static func persistedModels(for key: String) -> [String]? {
+        guard let d = UserDefaults.standard.dictionary(forKey: modelsUDKey),
+              d["hash"] as? String == keyFingerprint(key),
+              let at = d["at"] as? TimeInterval,
+              Date().timeIntervalSince1970 - at < modelsTTL,
+              let names = d["names"] as? [String], !names.isEmpty else { return nil }
+        return names
+    }
+
+    /// Extrae el retryDelay del cuerpo de error de Google (RetryInfo), tope 45 s
+    static func parseRetryDelay(_ data: Data) -> Double? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = obj["error"] as? [String: Any],
+              let details = error["details"] as? [[String: Any]] else { return nil }
+        for d in details {
+            guard let type = d["@type"] as? String, type.contains("RetryInfo"),
+                  let delay = d["retryDelay"] as? String else { continue }
+            let trimmed = delay.hasSuffix("s") ? String(delay.dropLast()) : delay
+            if let s = Double(trimmed), s > 0 { return min(s, 45) }
+        }
+        return nil
+    }
 
     struct ModelsResponse: Decodable {
         struct Model: Decodable {
@@ -34,9 +110,15 @@ enum Gemini {
 
     /// mgDiscoverModels
     static func discoverModels(_ key: String, refresh: Bool = false) throws -> [String] {
-        if !refresh, let cache = modelCache, cache.key == key,
-           Date().timeIntervalSince(cache.at) < 300 {
-            return cache.names
+        if !refresh {
+            if let cache = modelCache, cache.key == key,
+               Date().timeIntervalSince(cache.at) < 300 {
+                return cache.names
+            }
+            if let persisted = persistedModels(for: key) {
+                modelCache = (key, Date(), persisted)
+                return persisted
+            }
         }
         var token = ""
         var all: [ModelsResponse.Model] = []
@@ -73,20 +155,10 @@ enum Gemini {
                   excluded.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) == nil else { continue }
             names.insert(name.replacingOccurrences(of: "models/", with: ""))
         }
-        func rank(_ name: String) -> Int {
-            var r = 50
-            if name.contains("flash-lite") { r = 0 }
-            else if name.contains("flash") { r = 10 }
-            else if name.contains("pro") { r = 30 }
-            if name.contains("preview") || name.contains("exp") { r += 5 }
-            return r
-        }
-        let sorted = names.sorted { a, b in
-            if rank(a) != rank(b) { return rank(a) < rank(b) }
-            return a.compare(b, options: .numeric) == .orderedDescending
-        }
+        let sorted = rankModels(Array(names))
         if sorted.isEmpty { throw GeminiError.noModels }
         modelCache = (key, Date(), sorted)
+        persistModels(sorted, for: key)
         return sorted
     }
 
@@ -118,7 +190,10 @@ enum Gemini {
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try URLSession.shared.synchronousDataTask(with: req)
         let code = (response as? HTTPURLResponse)?.statusCode ?? -1
-        guard code == 200 else { throw GeminiError.http(code, model) }
+        guard code == 200 else {
+            if code == 429 { throw GeminiError.rateLimited(model, parseRetryDelay(data)) }
+            throw GeminiError.http(code, model)
+        }
         guard let parsed = try? JSONDecoder().decode(GenerateResponse.self, from: data) else {
             throw GeminiError.invalidJSON(model)
         }
@@ -252,23 +327,67 @@ enum Gemini {
         return out
     }
 
-    /// j0: genera un menú con IA probando modelos
+    /// j0: genera un menú con IA gastando las mínimas llamadas posibles:
+    /// primero el mejor modelo disponible y, si el límite por minuto salta (429),
+    /// espera lo que pida Google y reintenta antes de pasar al siguiente modelo.
     static func generateMenu(apiKey: String, dishes: [Dish], history: [WeekMenu], learning: Learning,
-                             weekKey: String, fixed: [Slot]) throws -> WeekMenu {
-        let prompt = menuPrompt(dishes: dishes, history: history, learning: learning, weekKey: weekKey, fixed: fixed)
-        var lastError: Error = GeminiError.connection("La IA no respondió")
+                             weekKey: String, fixed: [Slot],
+                             progress: ((Double, String) -> Void)? = nil) throws -> WeekMenu {
+        func report(_ p: Double, _ m: String) { progress?(min(max(p, 0), 1), m) }
+        report(0.05, "Preparando el encargo para la IA…")
+        if persistedModels(for: apiKey) == nil && modelCache?.key != apiKey {
+            report(0.10, "Consultando los modelos de tu clave…")
+        }
         let models = try discoverModels(apiKey)
-        for model in models.prefix(6) {
-            do {
-                let text = try call(model: model, key: apiKey, prompt: prompt)
-                if let json = parseJSON(text),
-                   let slots = validateMenu(json, dishes: dishes, weekKey: weekKey, fixed: fixed, history: history) {
-                    return WeekMenu(weekKey: weekKey, slots: slots, createdAt: Engine.isoNow(), source: "ia")
+        let candidates = candidateOrder(models: models, lastGood: lastGoodModel, limit: 3)
+        let prompt = menuPrompt(dishes: dishes, history: history, learning: learning, weekKey: weekKey, fixed: fixed)
+        let maxCalls = 5
+        var calls = 0
+        var lastError: Error = GeminiError.connection("La IA no respondió")
+
+        func callProgress() -> Double { min(0.8, 0.2 + 0.12 * Double(calls)) }
+
+        for (idx, model) in candidates.enumerated() {
+            let maxAttempts = idx == 0 ? 3 : 2
+            var attempt = 0
+            while attempt < maxAttempts && calls < maxCalls {
+                attempt += 1
+                calls += 1
+                report(callProgress(), attempt == 1 ? "Generando con la IA…" : "Reintentando con la IA…")
+                do {
+                    let text = try call(model: model, key: apiKey, prompt: prompt)
+                    report(0.9, "Validando el menú…")
+                    if let json = parseJSON(text),
+                       let slots = validateMenu(json, dishes: dishes, weekKey: weekKey, fixed: fixed, history: history) {
+                        lastGoodModel = model
+                        report(1.0, "¡Listo!")
+                        return WeekMenu(weekKey: weekKey, slots: slots, createdAt: Engine.isoNow(), source: "ia")
+                    }
+                    lastError = GeminiError.invalidJSON(model)
+                    break // respuesta inválida: pasar al siguiente modelo sin gastar más
+                } catch GeminiError.rateLimited(let m, let retryAfter) {
+                    lastError = GeminiError.rateLimited(m, retryAfter)
+                    guard attempt < maxAttempts, calls < maxCalls else { break }
+                    let wait = retryAfter ?? (attempt == 1 ? 20 : 35)
+                    var remaining = Int(wait.rounded(.up))
+                    while remaining > 0 {
+                        report(callProgress(), "Límite por minuto de Google. Reintento en \(remaining) s…")
+                        Thread.sleep(forTimeInterval: 1)
+                        remaining -= 1
+                    }
+                } catch GeminiError.http(let code, _) where code == 404 {
+                    // modelo retirado: refresca la lista una vez y sigue con el siguiente
+                    lastError = GeminiError.http(code, model)
+                    _ = try? discoverModels(apiKey, refresh: true)
+                    break
+                } catch {
+                    lastError = error
+                    break
                 }
-                lastError = GeminiError.invalidJSON(model)
-            } catch {
-                lastError = error
             }
+        }
+        if case GeminiError.rateLimited(let model, _) = lastError {
+            throw GeminiError.connection("\(model): error HTTP 429. Se esperó y reintentó varias veces y el límite sigue activo; prueba de nuevo en unos minutos.")
         }
         throw lastError
     }
