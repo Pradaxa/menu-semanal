@@ -33,6 +33,7 @@ struct MenuSemanalApp: App {
 struct RootView: View {
     let screenshotTarget: String?
     @EnvironmentObject private var store: AppStore
+    @Environment(\.colorScheme) private var scheme
     @State private var tab = 0
 
     var body: some View {
@@ -54,7 +55,7 @@ struct RootView: View {
                         .tabItem { Label("Ajustes", systemImage: "gearshape") }
                         .tag(3)
                 }
-                .tint(Color(red: 0.451, green: 0.659, blue: 0.604))
+                .tint(Color.tealScheme(scheme))
             }
         }
         .onAppear {

@@ -3,11 +3,11 @@ import SwiftUI
 // MARK: - Colores de la web app (mismos tokens)
 
 extension Color {
-    /// #73a89a (claro) / #6aab92 (oscuro)
+    /// #2dba70 (claro) / #4cd58a (oscuro): el verde de siempre, más vivo
     static func tealScheme(_ scheme: ColorScheme) -> Color {
         scheme == .dark
-            ? Color(red: 0.416, green: 0.671, blue: 0.573)
-            : Color(red: 0.451, green: 0.659, blue: 0.604)
+            ? Color(red: 0.298, green: 0.835, blue: 0.541)
+            : Color(red: 0.176, green: 0.729, blue: 0.439)
     }
     static func ink(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color(red: 0.906, green: 0.925, blue: 0.914) : Color(red: 0.145, green: 0.122, blue: 0.129)

@@ -185,7 +185,7 @@ struct MenuView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color(red: 0.23, green: 0.55, blue: 0.35))
+                .tint(Color(red: 0.145, green: 0.671, blue: 0.373))
             }
         }
         if generating {
