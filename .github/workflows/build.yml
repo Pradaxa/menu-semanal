@@ -16,12 +16,13 @@ permissions:
 
 jobs:
   ios:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
       - name: Toolchain
         run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app
           xcodebuild -version
           brew install xcodegen
           xcodegen --version
