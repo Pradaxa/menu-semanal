@@ -34,13 +34,13 @@ struct GenActivityBanner: View {
                 colors: dark
                     ? [Color(red: 0.03, green: 0.14, blue: 0.11), Color(red: 0.05, green: 0.22, blue: 0.17)]
                     : [Color(red: 0.84, green: 0.96, blue: 0.89), Color(red: 0.72, green: 0.92, blue: 0.82)],
-                startPoint: .topLeading, endPoint: .bottomTrailing)
+                startPoint: .leading, endPoint: .trailing)
             RadialGradient(colors: [green.opacity(dark ? 0.55 : 0.45), .clear],
-                           center: .topLeading, startRadius: 0, endRadius: 190)
+                           center: .leading, startRadius: 0, endRadius: 190)
             RadialGradient(colors: [Color(red: 0.15, green: 0.72, blue: 0.72).opacity(dark ? 0.40 : 0.30), .clear],
-                           center: .bottomTrailing, startRadius: 0, endRadius: 210)
+                           center: .trailing, startRadius: 0, endRadius: 210)
             RadialGradient(colors: [Color(red: 0.55, green: 0.85, blue: 0.40).opacity(dark ? 0.28 : 0.30), .clear],
-                           center: UnitPoint(x: 0.55, y: 0.0), startRadius: 0, endRadius: 150)
+                           center: UnitPoint(x: 0.55, y: 0.5), startRadius: 0, endRadius: 150)
         }
     }
 
@@ -69,6 +69,6 @@ struct GenActivityBanner: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background { aurora }
+        .background { aurora.ignoresSafeArea() }
     }
 }

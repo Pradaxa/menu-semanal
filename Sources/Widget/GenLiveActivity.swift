@@ -23,8 +23,8 @@ struct GenLiveActivity: Widget {
             GenActivityBanner(progress: context.state.progress, stage: context.state.stage)
                 .activityBackgroundTint(Color(uiColor: UIColor { t in
                     t.userInterfaceStyle == .dark
-                        ? UIColor(red: 0.04, green: 0.18, blue: 0.14, alpha: 1)
-                        : UIColor(red: 0.78, green: 0.94, blue: 0.86, alpha: 1)
+                        ? UIColor(red: 0.06, green: 0.27, blue: 0.20, alpha: 1)
+                        : UIColor(red: 0.74, green: 0.93, blue: 0.84, alpha: 1)
                 }))
         } dynamicIsland: { context in
             DynamicIsland {
