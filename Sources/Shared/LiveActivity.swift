@@ -1,5 +1,6 @@
 import ActivityKit
 import SwiftUI
+import UIKit
 
 /// Live Activity del progreso de generación con IA.
 /// La UI vive en la extensión de widget; el estado viaja en ContentState.
@@ -26,18 +27,26 @@ struct GenActivityBanner: View {
     }
 
     var body: some View {
-        VStack(spacing: 5) {
-            HStack(spacing: 6) {
-                Text(stage.isEmpty ? "Generando el menú…" : stage)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 6)
-                Text("\(Int((progress * 100).rounded()))%")
-                    .font(.caption.bold().monospacedDigit())
+        HStack(spacing: 8) {
+            if let icon = UIImage(named: "icon-live") {
+                Image(uiImage: icon)
+                    .resizable()
+                    .frame(width: 26, height: 26)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
-            ProgressView(value: progress, total: 1)
-                .tint(green)
+            VStack(spacing: 5) {
+                HStack(spacing: 6) {
+                    Text(stage.isEmpty ? "Generando el menú…" : stage)
+                        .font(.caption)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 6)
+                    Text("\(Int((progress * 100).rounded()))%")
+                        .font(.caption.bold().monospacedDigit())
+                }
+                ProgressView(value: progress, total: 1)
+                    .tint(green)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)

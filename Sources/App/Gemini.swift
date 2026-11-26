@@ -6,7 +6,7 @@ enum GeminiError: LocalizedError {
     case noKey
     case connection(String)
     case http(Int, String)
-    case rateLimited(String, Double?)
+    case rateLimited(String, Double?, Bool)
     case invalidJSON(String)
     case noModels
 
@@ -15,7 +15,7 @@ enum GeminiError: LocalizedError {
         case .noKey: return "Pega tu clave de Gemini en Ajustes."
         case .connection(let m): return m
         case .http(let code, let what): return "\(what): error HTTP \(code)."
-        case .rateLimited(let model, _): return "\(model): error HTTP 429."
+        case .rateLimited(let model, _, _): return "\(model): error HTTP 429."
         case .invalidJSON(let model): return "\(model): JSON inválido"
         case .noModels: return "models.list respondió, pero no anuncia ningún modelo Gemini de texto con generateContent para esta clave."
         }
@@ -46,6 +46,7 @@ enum Gemini {
             else if name.contains("flash-lite") { r = 20 }
             else if name.contains("flash") { r = 10 }
             if name.contains("preview") || name.contains("exp") { r += 5 }
+            if name.contains("customtools") { r += 2 } // variante: misma familia, va después de la base
             return r
         }
         return names.sorted { a, b in
@@ -85,7 +86,8 @@ enum Gemini {
         return names
     }
 
-    /// Extrae el retryDelay del cuerpo de error de Google (RetryInfo), tope 45 s
+    /// Extrae el retryDelay del cuerpo de error de Google (RetryInfo), tope 65 s
+    /// (la ventana del límite por minuto puede llegar a ~60 s)
     static func parseRetryDelay(_ data: Data) -> Double? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = obj["error"] as? [String: Any],
@@ -94,9 +96,25 @@ enum Gemini {
             guard let type = d["@type"] as? String, type.contains("RetryInfo"),
                   let delay = d["retryDelay"] as? String else { continue }
             let trimmed = delay.hasSuffix("s") ? String(delay.dropLast()) : delay
-            if let s = Double(trimmed), s > 0 { return min(s, 45) }
+            if let s = Double(trimmed), s > 0 { return min(s, 65) }
         }
         return nil
+    }
+
+    /// ¿Es un 429 de cuota DIARIA agotada (QuotaFailure per_day)?
+    /// El diario no se arregla esperando un minuto: hay que saltar a otro modelo.
+    static func parseQuotaIsDaily(_ data: Data) -> Bool {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = obj["error"] as? [String: Any],
+              let details = error["details"] as? [[String: Any]] else { return false }
+        for d in details {
+            guard let type = d["@type"] as? String, type.contains("QuotaFailure"),
+                  let violations = d["violations"] as? [[String: Any]] else { continue }
+            for v in violations {
+                if let metric = v["quotaMetric"] as? String, metric.contains("per_day") { return true }
+            }
+        }
+        return false
     }
 
     struct ModelsResponse: Decodable {
@@ -191,7 +209,7 @@ enum Gemini {
         let (data, response) = try URLSession.shared.synchronousDataTask(with: req)
         let code = (response as? HTTPURLResponse)?.statusCode ?? -1
         guard code == 200 else {
-            if code == 429 { throw GeminiError.rateLimited(model, parseRetryDelay(data)) }
+            if code == 429 { throw GeminiError.rateLimited(model, parseRetryDelay(data), parseQuotaIsDaily(data)) }
             throw GeminiError.http(code, model)
         }
         guard let parsed = try? JSONDecoder().decode(GenerateResponse.self, from: data) else {
@@ -339,16 +357,18 @@ enum Gemini {
             report(0.10, "Consultando los modelos de tu clave…")
         }
         let models = try discoverModels(apiKey)
-        let candidates = candidateOrder(models: models, lastGood: lastGoodModel, limit: 3)
+        let candidates = candidateOrder(models: models, lastGood: lastGoodModel, limit: 4)
         let prompt = menuPrompt(dishes: dishes, history: history, learning: learning, weekKey: weekKey, fixed: fixed)
-        let maxCalls = 5
+        let maxCalls = 6
         var calls = 0
+        var sawDailyQuota = false
+        var sawMinuteQuota = false
         var lastError: Error = GeminiError.connection("La IA no respondió")
 
-        func callProgress() -> Double { min(0.8, 0.2 + 0.12 * Double(calls)) }
+        func callProgress() -> Double { min(0.8, 0.2 + 0.10 * Double(calls)) }
 
-        for (idx, model) in candidates.enumerated() {
-            let maxAttempts = idx == 0 ? 3 : 2
+        for model in candidates {
+            let maxAttempts = 2
             var attempt = 0
             while attempt < maxAttempts && calls < maxCalls {
                 attempt += 1
@@ -365,8 +385,15 @@ enum Gemini {
                     }
                     lastError = GeminiError.invalidJSON(model)
                     break // respuesta inválida: pasar al siguiente modelo sin gastar más
-                } catch GeminiError.rateLimited(let m, let retryAfter) {
-                    lastError = GeminiError.rateLimited(m, retryAfter)
+                } catch GeminiError.rateLimited(let m, let retryAfter, let daily) {
+                    lastError = GeminiError.rateLimited(m, retryAfter, daily)
+                    if daily {
+                        // Cuota DIARIA agotada en este modelo: esperar no sirve; saltar al siguiente.
+                        sawDailyQuota = true
+                        report(callProgress(), "Cuota diaria agotada en este modelo. Pruebo otro…")
+                        break
+                    }
+                    sawMinuteQuota = true
                     guard attempt < maxAttempts, calls < maxCalls else { break }
                     let wait = retryAfter ?? (attempt == 1 ? 20 : 35)
                     var remaining = Int(wait.rounded(.up))
@@ -386,7 +413,10 @@ enum Gemini {
                 }
             }
         }
-        if case GeminiError.rateLimited(let model, _) = lastError {
+        if case GeminiError.rateLimited(let model, _, _) = lastError {
+            if sawDailyQuota && !sawMinuteQuota {
+                throw GeminiError.connection("\(model): error HTTP 429. Google ha agotado la cuota DIARIA de tu clave en los modelos disponibles; se renueva sobre las 09:00 (hora peninsular).")
+            }
             throw GeminiError.connection("\(model): error HTTP 429. Se esperó y reintentó varias veces y el límite sigue activo; prueba de nuevo en unos minutos.")
         }
         throw lastError

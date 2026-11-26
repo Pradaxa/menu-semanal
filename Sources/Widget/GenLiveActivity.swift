@@ -1,10 +1,23 @@
 import ActivityKit
 import SwiftUI
+import UIKit
 import WidgetKit
 
 /// Live Activity de la generación con IA: barra de progreso + un texto, altura mínima.
 /// Sin APNs: la app la arranca, actualiza y cierra localmente mientras genera.
 struct GenLiveActivity: Widget {
+    @ViewBuilder private static var appIcon: some View {
+        if let icon = UIImage(named: "icon-live") {
+            Image(uiImage: icon)
+                .resizable()
+                .frame(width: 16, height: 16)
+                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else {
+            Image(systemName: "fork.knife")
+                .font(.caption2)
+        }
+    }
+
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: GenActivityAttributes.self) { context in
             GenActivityBanner(progress: context.state.progress, stage: context.state.stage)
@@ -17,11 +30,9 @@ struct GenLiveActivity: Widget {
                 Text("\(Int((context.state.progress * 100).rounded()))%")
                     .font(.caption2.bold().monospacedDigit())
             } compactTrailing: {
-                Image(systemName: "fork.knife")
-                    .font(.caption2)
+                GenLiveActivity.appIcon
             } minimal: {
-                Image(systemName: "fork.knife")
-                    .font(.caption2)
+                GenLiveActivity.appIcon
             }
         }
     }

@@ -150,8 +150,13 @@ enum SelfTest {
         let body = #"{"error":{"code":429,"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"23.5s"}]}}"#.data(using: .utf8)!
         check("retrydelay-parsed", Gemini.parseRetryDelay(body) == 23.5)
         let bodyBig = #"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"300s"}]}}"#.data(using: .utf8)!
-        check("retrydelay-capped", Gemini.parseRetryDelay(bodyBig) == 45)
+        check("retrydelay-capped", Gemini.parseRetryDelay(bodyBig) == 65)
         check("retrydelay-nil", Gemini.parseRetryDelay(Data("{}".utf8)) == nil)
+        check("rank-customtools-after-base", Gemini.rankModels(["gemini-3.1-pro-preview-customtools", "gemini-3.1-pro-preview"]).first == "gemini-3.1-pro-preview")
+        let dailyBody = #"{"error":{"code":429,"details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_requests_per_model_per_day"}]}]}}"#.data(using: .utf8)!
+        check("quota-daily-detected", Gemini.parseQuotaIsDaily(dailyBody))
+        let minuteBody = #"{"error":{"code":429,"details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_requests_per_model_per_minute"}]}]}}"#.data(using: .utf8)!
+        check("quota-minute-not-daily", !Gemini.parseQuotaIsDaily(minuteBody))
         check("fingerprint-stable", Gemini.keyFingerprint("abc") == Gemini.keyFingerprint("abc") && Gemini.keyFingerprint("abc") != Gemini.keyFingerprint("abd"))
 
         // 16. Live Activity: arranca, acepta una actualización y cierra
