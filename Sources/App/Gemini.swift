@@ -84,6 +84,20 @@ enum Gemini {
         return out
     }
 
+    /// Motivo legible de un fallo (para el aviso de diagnóstico)
+    static func describe(_ error: Error) -> String {
+        if case GeminiError.http(let code, _) = error { return "HTTP \(code)" }
+        if case GeminiError.invalidJSON = error { return "sin texto utilizable" }
+        if let u = error as? URLError {
+            switch u.code {
+            case .timedOut: return "tiempo agotado"
+            case .notConnectedToInternet, .networkConnectionLost: return "sin conexión"
+            default: return "red (\(u.code.rawValue))"
+            }
+        }
+        return "error"
+    }
+
     static var lastGoodModel: String? {
         get { UserDefaults.standard.string(forKey: lastGoodUDKey) }
         set { UserDefaults.standard.set(newValue, forKey: lastGoodUDKey) }
@@ -210,13 +224,13 @@ enum Gemini {
     }
 
     /// mgCall
-    static func call(model: String, key: String, prompt: String, schema: [String: Any]? = nil) throws -> String {
+    static func call(model: String, key: String, prompt: String, schema: [String: Any]? = nil, timeout: TimeInterval = 30) throws -> String {
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue(key, forHTTPHeaderField: "x-goog-api-key")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 30
+        req.timeoutInterval = timeout
         var generationConfig: [String: Any] = ["responseMimeType": "application/json"]
         if let schema = schema { generationConfig["responseSchema"] = schema }
         let body: [String: Any] = [
@@ -334,8 +348,10 @@ enum Gemini {
                     out.append(f)
                     continue
                 }
-                guard let id = row[key] as? String, id != "fuera", let dish = byId[id] else { return rejected("plato inexistente o no válido") }
-                guard eligible.contains(where: { $0.id == id }) else { return rejected("plato fuera de temporada o no permitido") }
+                guard let id = row[key] as? String, id != "fuera", let dish = byId[id] else {
+                    return rejected("plato inexistente o no válido: \(String(describing: row[key]).prefix(40))")
+                }
+                guard eligible.contains(where: { $0.id == id }) else { return rejected("plato fuera de temporada o no permitido: \(id.prefix(40))") }
                 guard dish.meal == "ambas" || dish.meal == meal else { return rejected("plato en un momento que no le corresponde") }
                 if let b = bias[id], b != meal { return rejected("plato en un momento que no le corresponde") }
                 out.append(Slot(day: day, meal: meal, dishId: id))
@@ -386,6 +402,31 @@ enum Gemini {
         let prompt = menuPrompt(dishes: dishes, history: history, learning: learning, weekKey: weekKey, fixed: fixed)
         let maxCalls = 9
         var calls = 0
+        // Esquema de respuesta: los ids solo pueden ser platos válidos (evita ids inventados)
+        let validIds = Engine.eligible(dishes, weekKey).map { $0.id } + fixed.map { $0.dishId }
+        let idEnum = Array(Set(validIds)).sorted()
+        let menuSchema: [String: Any] = [
+            "type": "OBJECT",
+            "properties": ["menu": ["type": "ARRAY", "minItems": 7, "maxItems": 7, "items": [
+                "type": "OBJECT",
+                "properties": [
+                    "day": ["type": "INTEGER"],
+                    "lunch": ["type": "STRING", "enum": idEnum],
+                    "dinner": ["type": "STRING", "enum": idEnum],
+                ],
+                "required": ["day", "lunch", "dinner"],
+            ]]],
+            "required": ["menu"],
+        ]
+        var useSchema = true
+        // Con esquema (ids acotados); si Google lo rechaza (400), se repite sin esquema
+        func attempt(_ model: String, _ text: String) throws -> String {
+            if useSchema {
+                do { return try call(model: model, key: apiKey, prompt: text, schema: menuSchema, timeout: 45) }
+                catch GeminiError.http(let code, _) where code == 400 { useSchema = false }
+            }
+            return try call(model: model, key: apiKey, prompt: text, timeout: 45)
+        }
         var sawDailyQuota = false
         var sawMinuteQuota = false
         var outcomes: [String: String] = [:] // modelo -> motivo del último fallo (diagnóstico)
@@ -406,7 +447,7 @@ enum Gemini {
                 calls += 1
                 report(callProgress(), pass == 1 ? "Generando con la IA…" : "Reintentando con la IA…")
                 do {
-                    let text = try call(model: model, key: apiKey, prompt: prompt)
+                    let text = try attempt(model, prompt)
                     report(0.9, "Validando el menú…")
                     var why = "JSON ilegible"
                     if let json = parseJSON(text) {
@@ -424,7 +465,7 @@ enum Gemini {
                         calls += 1
                         report(callProgress(), "Corrigiendo la respuesta de la IA…")
                         let fixPrompt = prompt + " AVISO: tu respuesta anterior incumplía esta regla: \(why). Genera de nuevo el menú completo respetando TODAS las reglas."
-                        if let t2 = try? call(model: model, key: apiKey, prompt: fixPrompt),
+                        if let t2 = try? attempt(model, fixPrompt),
                            let j2 = parseJSON(t2),
                            let slots2 = validateMenu(j2, dishes: dishes, weekKey: weekKey, fixed: fixed, history: history) {
                             lastGoodModel = model
@@ -450,7 +491,7 @@ enum Gemini {
                     _ = try? discoverModels(apiKey, refresh: true)
                 } catch {
                     lastError = error
-                    outcomes[model] = "error"
+                    outcomes[model] = describe(error)
                 }
             }
             guard !retry.isEmpty, calls < maxCalls else { break }
