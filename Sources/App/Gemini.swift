@@ -357,23 +357,28 @@ enum Gemini {
             report(0.10, "Consultando los modelos de tu clave…")
         }
         let models = try discoverModels(apiKey)
-        let candidates = candidateOrder(models: models, lastGood: lastGoodModel, limit: 4)
+        let candidates = candidateOrder(models: models, lastGood: lastGoodModel, limit: 6)
         let prompt = menuPrompt(dishes: dishes, history: history, learning: learning, weekKey: weekKey, fixed: fixed)
-        let maxCalls = 6
+        let maxCalls = 9
         var calls = 0
         var sawDailyQuota = false
         var sawMinuteQuota = false
         var lastError: Error = GeminiError.connection("La IA no respondió")
 
-        func callProgress() -> Double { min(0.8, 0.2 + 0.10 * Double(calls)) }
+        func callProgress() -> Double { min(0.8, 0.2 + 0.07 * Double(calls)) }
 
-        for model in candidates {
-            let maxAttempts = 2
-            var attempt = 0
-            while attempt < maxAttempts && calls < maxCalls {
-                attempt += 1
+        // Cada modelo tiene su propia cuota: ante un 429 se prueba el SIGUIENTE al instante
+        // (sin esperar). Solo se espera cuando todos los pendientes han dado 429 por minuto.
+        var pending = candidates
+        var pass = 0
+        while !pending.isEmpty && calls < maxCalls && pass < 3 {
+            pass += 1
+            var retry: [String] = []
+            var minWait: Double?
+            for model in pending {
+                if calls >= maxCalls { break }
                 calls += 1
-                report(callProgress(), attempt == 1 ? "Generando con la IA…" : "Reintentando con la IA…")
+                report(callProgress(), pass == 1 ? "Generando con la IA…" : "Reintentando con la IA…")
                 do {
                     let text = try call(model: model, key: apiKey, prompt: prompt)
                     report(0.9, "Validando el menú…")
@@ -384,34 +389,32 @@ enum Gemini {
                         return WeekMenu(weekKey: weekKey, slots: slots, createdAt: Engine.isoNow(), source: "ia")
                     }
                     lastError = GeminiError.invalidJSON(model)
-                    break // respuesta inválida: pasar al siguiente modelo sin gastar más
                 } catch GeminiError.rateLimited(let m, let retryAfter, let daily) {
                     lastError = GeminiError.rateLimited(m, retryAfter, daily)
                     if daily {
-                        // Cuota DIARIA agotada en este modelo: esperar no sirve; saltar al siguiente.
                         sawDailyQuota = true
                         report(callProgress(), "Cuota diaria agotada en este modelo. Pruebo otro…")
-                        break
-                    }
-                    sawMinuteQuota = true
-                    guard attempt < maxAttempts, calls < maxCalls else { break }
-                    let wait = retryAfter ?? (attempt == 1 ? 20 : 35)
-                    var remaining = Int(wait.rounded(.up))
-                    while remaining > 0 {
-                        report(callProgress(), "Límite por minuto de Google. Reintento en \(remaining) s…")
-                        Thread.sleep(forTimeInterval: 1)
-                        remaining -= 1
+                    } else {
+                        sawMinuteQuota = true
+                        retry.append(model)
+                        minWait = min(minWait ?? 65, retryAfter ?? 25)
+                        report(callProgress(), "Este modelo está al límite. Pruebo otro…")
                     }
                 } catch GeminiError.http(let code, _) where code == 404 {
-                    // modelo retirado: refresca la lista una vez y sigue con el siguiente
                     lastError = GeminiError.http(code, model)
                     _ = try? discoverModels(apiKey, refresh: true)
-                    break
                 } catch {
                     lastError = error
-                    break
                 }
             }
+            guard !retry.isEmpty, calls < maxCalls else { break }
+            var remaining = Int((minWait ?? 25).rounded(.up))
+            while remaining > 0 {
+                report(callProgress(), "Límite por minuto de Google. Reintento en \(remaining) s…")
+                Thread.sleep(forTimeInterval: 1)
+                remaining -= 1
+            }
+            pending = retry
         }
         if case GeminiError.rateLimited(let model, _, _) = lastError {
             if sawDailyQuota && !sawMinuteQuota {
