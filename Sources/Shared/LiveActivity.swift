@@ -69,6 +69,12 @@ struct GenActivityBanner: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background { aurora.ignoresSafeArea() }
+        .background {
+            // Más alto que la tarjeta a propósito: iOS deja un margen propio alrededor del contenido
+            // (en el bloqueo se veía como franjas más oscuras arriba y abajo) y así queda cubierto.
+            aurora
+                .frame(maxWidth: .infinity)
+                .frame(height: 600)
+        }
     }
 }
