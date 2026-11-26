@@ -363,6 +363,7 @@ enum Gemini {
         var calls = 0
         var sawDailyQuota = false
         var sawMinuteQuota = false
+        var outcomes: [String: String] = [:] // modelo -> motivo del último fallo (diagnóstico)
         var lastError: Error = GeminiError.connection("La IA no respondió")
 
         func callProgress() -> Double { min(0.8, 0.2 + 0.07 * Double(calls)) }
@@ -389,8 +390,10 @@ enum Gemini {
                         return WeekMenu(weekKey: weekKey, slots: slots, createdAt: Engine.isoNow(), source: "ia")
                     }
                     lastError = GeminiError.invalidJSON(model)
+                    outcomes[model] = "respuesta no válida"
                 } catch GeminiError.rateLimited(let m, let retryAfter, let daily) {
                     lastError = GeminiError.rateLimited(m, retryAfter, daily)
+                    outcomes[model] = daily ? "cuota diaria" : "límite por minuto"
                     if daily {
                         sawDailyQuota = true
                         report(callProgress(), "Cuota diaria agotada en este modelo. Pruebo otro…")
@@ -402,9 +405,11 @@ enum Gemini {
                     }
                 } catch GeminiError.http(let code, _) where code == 404 {
                     lastError = GeminiError.http(code, model)
+                    outcomes[model] = "no disponible (404)"
                     _ = try? discoverModels(apiKey, refresh: true)
                 } catch {
                     lastError = error
+                    outcomes[model] = "error"
                 }
             }
             guard !retry.isEmpty, calls < maxCalls else { break }
@@ -416,11 +421,12 @@ enum Gemini {
             }
             pending = retry
         }
-        if case GeminiError.rateLimited(let model, _, _) = lastError {
+        if case GeminiError.rateLimited = lastError {
+            let detail = candidates.compactMap { m in outcomes[m].map { "\(m): \($0)" } }.joined(separator: "; ")
             if sawDailyQuota && !sawMinuteQuota {
-                throw GeminiError.connection("\(model): error HTTP 429. Google ha agotado la cuota DIARIA de tu clave en los modelos disponibles; se renueva sobre las 09:00 (hora peninsular).")
+                throw GeminiError.connection("Error HTTP 429. Google ha agotado la cuota DIARIA de tu clave en todos los modelos probados (\(detail)); se renueva sobre las 09:00 (hora peninsular). La cuota es del proyecto de Google Cloud, no de la app.")
             }
-            throw GeminiError.connection("\(model): error HTTP 429. Se esperó y reintentó varias veces y el límite sigue activo; prueba de nuevo en unos minutos.")
+            throw GeminiError.connection("Error HTTP 429. Google tiene limitada tu clave en todos los modelos probados (\(detail)). La cuota es del proyecto de Google Cloud y la comparten tus claves y otras apps; prueba de nuevo en unos minutos.")
         }
         throw lastError
     }

@@ -50,22 +50,5 @@ struct GenActivityBanner: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .liquidGlassCard()
-    }
-}
-
-extension View {
-    /// Liquid Glass en iOS 26+; en versiones anteriores se queda como está.
-    @ViewBuilder
-    func liquidGlassCard() -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            self.glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
     }
 }
