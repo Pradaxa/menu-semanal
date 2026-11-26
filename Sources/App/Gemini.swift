@@ -310,27 +310,34 @@ enum Gemini {
     }
 
     /// V1: valida la respuesta de la IA
+    /// Motivo de la última validación fallida (diagnóstico y corrección)
+    static var lastValidationFailure = ""
+    static func rejected(_ reason: String) -> [Slot]? {
+        lastValidationFailure = reason
+        return nil
+    }
+
     static func validateMenu(_ json: [String: Any], dishes: [Dish], weekKey: String, fixed: [Slot], history: [WeekMenu]) -> [Slot]? {
-        guard let rows = json["menu"] as? [[String: Any]], rows.count == 7 else { return nil }
+        guard let rows = json["menu"] as? [[String: Any]], rows.count == 7 else { return rejected("no trae exactamente 7 días") }
         let byId = Dictionary(uniqueKeysWithValues: dishes.map { ($0.id, $0) })
         let bias = Engine.mealBias(history)
         let eligible = Engine.eligible(dishes, weekKey)
         func fixedSlot(_ day: Int, _ meal: String) -> Slot? {
             fixed.first { $0.day == day && $0.meal == meal }
         }
-        guard Set(rows.compactMap { $0["day"] as? Int }).count == 7 else { return nil }
+        guard Set(rows.compactMap { $0["day"] as? Int }).count == 7 else { return rejected("días repetidos o ausentes") }
         var out: [Slot] = []
         for row in rows {
-            guard let day = row["day"] as? Int, day >= 0, day <= 6 else { return nil }
+            guard let day = row["day"] as? Int, day >= 0, day <= 6 else { return rejected("día fuera de rango") }
             for (meal, key) in [("comida", "lunch"), ("cena", "dinner")] {
                 if let f = fixedSlot(day, meal) {
                     out.append(f)
                     continue
                 }
-                guard let id = row[key] as? String, id != "fuera", let dish = byId[id] else { return nil }
-                guard eligible.contains(where: { $0.id == id }) else { return nil }
-                guard dish.meal == "ambas" || dish.meal == meal else { return nil }
-                if let b = bias[id], b != meal { return nil }
+                guard let id = row[key] as? String, id != "fuera", let dish = byId[id] else { return rejected("plato inexistente o no válido") }
+                guard eligible.contains(where: { $0.id == id }) else { return rejected("plato fuera de temporada o no permitido") }
+                guard dish.meal == "ambas" || dish.meal == meal else { return rejected("plato en un momento que no le corresponde") }
+                if let b = bias[id], b != meal { return rejected("plato en un momento que no le corresponde") }
                 out.append(Slot(day: day, meal: meal, dishId: id))
             }
         }
@@ -339,15 +346,15 @@ enum Gemini {
             byDish[s.dishId, default: []].append(s.day)
         }
         for (id, days) in byDish {
-            guard let dish = byId[id] else { return nil }
+            guard let dish = byId[id] else { return rejected("plato inexistente") }
             let fixedCount = fixed.filter { $0.dishId == id }.count
-            if days.count > max(dish.timesPerWeek, fixedCount) { return nil }
+            if days.count > max(dish.timesPerWeek, fixedCount) { return rejected("plato repetido más veces de su máximo semanal") }
             let sorted = days.sorted()
             for i in 1..<sorted.count {
                 if sorted[i] - sorted[i - 1] > 2 {
                     let bothFixed = fixed.contains { $0.dishId == id && $0.day == sorted[i] }
                         && fixed.contains { $0.dishId == id && $0.day == sorted[i - 1] }
-                    if !bothFixed { return nil }
+                    if !bothFixed { return rejected("el mismo plato separado más de 2 días") }
                 }
             }
         }
@@ -357,7 +364,7 @@ enum Gemini {
             let bothFixed = fixedSlot(day, "comida") != nil && fixedSlot(day, "cena") != nil
             if !bothFixed, let l = lunch, let d = dinner {
                 let lunchTags = Set(byId[l.dishId]?.tags ?? [])
-                if (byId[d.dishId]?.tags ?? []).contains(where: { lunchTags.contains($0) }) { return nil }
+                if (byId[d.dishId]?.tags ?? []).contains(where: { lunchTags.contains($0) }) { return rejected("comida y cena con la misma categoría el mismo día") }
             }
         }
         return out
@@ -401,14 +408,30 @@ enum Gemini {
                 do {
                     let text = try call(model: model, key: apiKey, prompt: prompt)
                     report(0.9, "Validando el menú…")
-                    if let json = parseJSON(text),
-                       let slots = validateMenu(json, dishes: dishes, weekKey: weekKey, fixed: fixed, history: history) {
-                        lastGoodModel = model
-                        report(1.0, "¡Listo!")
-                        return WeekMenu(weekKey: weekKey, slots: slots, createdAt: Engine.isoNow(), source: "ia")
+                    var why = "JSON ilegible"
+                    if let json = parseJSON(text) {
+                        if let slots = validateMenu(json, dishes: dishes, weekKey: weekKey, fixed: fixed, history: history) {
+                            lastGoodModel = model
+                            report(1.0, "¡Listo!")
+                            return WeekMenu(weekKey: weekKey, slots: slots, createdAt: Engine.isoNow(), source: "ia")
+                        }
+                        why = lastValidationFailure
                     }
                     lastError = GeminiError.invalidJSON(model)
-                    outcomes[model] = "respuesta no válida"
+                    outcomes[model] = "respuesta no válida (\(why))"
+                    // Un solo reintento con el mismo modelo, diciéndole qué regla incumplió
+                    if calls < maxCalls {
+                        calls += 1
+                        report(callProgress(), "Corrigiendo la respuesta de la IA…")
+                        let fixPrompt = prompt + " AVISO: tu respuesta anterior incumplía esta regla: \(why). Genera de nuevo el menú completo respetando TODAS las reglas."
+                        if let t2 = try? call(model: model, key: apiKey, prompt: fixPrompt),
+                           let j2 = parseJSON(t2),
+                           let slots2 = validateMenu(j2, dishes: dishes, weekKey: weekKey, fixed: fixed, history: history) {
+                            lastGoodModel = model
+                            report(1.0, "¡Listo!")
+                            return WeekMenu(weekKey: weekKey, slots: slots2, createdAt: Engine.isoNow(), source: "ia")
+                        }
+                    }
                 } catch GeminiError.rateLimited(let m, let retryAfter, let daily) {
                     lastError = GeminiError.rateLimited(m, retryAfter, daily)
                     outcomes[model] = daily ? "cuota diaria" : "límite por minuto"
@@ -445,6 +468,10 @@ enum Gemini {
                 throw GeminiError.connection("Error HTTP 429. Google ha agotado la cuota DIARIA de tu clave en todos los modelos probados (\(detail)); se renueva sobre las 09:00 (hora peninsular). La cuota es del proyecto de Google Cloud, no de la app.")
             }
             throw GeminiError.connection("Error HTTP 429. Google tiene limitada tu clave en todos los modelos probados (\(detail)). La cuota es del proyecto de Google Cloud y la comparten tus claves y otras apps; prueba de nuevo en unos minutos.")
+        }
+        if !outcomes.isEmpty {
+            let detail = candidates.compactMap { m in outcomes[m].map { "\(m): \($0)" } }.joined(separator: "; ")
+            throw GeminiError.connection("La IA no devolvió un menú válido (\(detail)).")
         }
         throw lastError
     }
