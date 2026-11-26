@@ -520,7 +520,7 @@ enum Gemini {
             if sawDailyQuota && !sawMinuteQuota {
                 throw GeminiError.connection("Error HTTP 429. Google ha agotado la cuota DIARIA de tu clave en todos los modelos probados (\(detail)); se renueva sobre las 09:00 (hora peninsular). La cuota es del proyecto de Google Cloud, no de la app.")
             }
-            throw GeminiError.connection("Error HTTP 429. Google tiene limitada tu clave en todos los modelos probados (\(detail)). La cuota es del proyecto de Google Cloud y la comparten tus claves y otras apps; prueba de nuevo en unos minutos.")
+            throw GeminiError.connection("Error HTTP 429. Google tiene limitada tu clave en todos los modelos probados (\(detail)). La cuota gratuita es del proyecto de Google Cloud de tu clave; prueba de nuevo en unos minutos.")
         }
         if !outcomes.isEmpty {
             let detail = candidates.compactMap { m in outcomes[m].map { "\(m): \($0)" } }.joined(separator: "; ")
