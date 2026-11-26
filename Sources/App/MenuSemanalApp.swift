@@ -149,7 +149,7 @@ struct LiveActivityPreviewScreen: View {
                     .foregroundStyle(.secondary)
                 GenActivityBanner(progress: 0.45, stage: "Generando con la IA…")
                     .background(.regularMaterial,
-                                in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(.horizontal, 16)
             }
         }

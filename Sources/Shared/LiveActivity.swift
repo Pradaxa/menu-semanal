@@ -32,7 +32,7 @@ struct GenActivityBanner: View {
                 Image(uiImage: icon)
                     .resizable()
                     .frame(width: 26, height: 26)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 26 * 0.2237, style: .continuous))
             }
             VStack(spacing: 5) {
                 HStack(spacing: 6) {

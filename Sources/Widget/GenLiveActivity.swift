@@ -11,7 +11,7 @@ struct GenLiveActivity: Widget {
             Image(uiImage: icon)
                 .resizable()
                 .frame(width: 16, height: 16)
-                .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 16 * 0.2237, style: .continuous))
         } else {
             Image(systemName: "fork.knife")
                 .font(.caption2)
