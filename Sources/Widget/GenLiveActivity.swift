@@ -21,6 +21,11 @@ struct GenLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: GenActivityAttributes.self) { context in
             GenActivityBanner(progress: context.state.progress, stage: context.state.stage)
+                .activityBackgroundTint(Color(uiColor: UIColor { t in
+                    t.userInterfaceStyle == .dark
+                        ? UIColor(red: 0.04, green: 0.18, blue: 0.14, alpha: 1)
+                        : UIColor(red: 0.78, green: 0.94, blue: 0.86, alpha: 1)
+                }))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.center) {

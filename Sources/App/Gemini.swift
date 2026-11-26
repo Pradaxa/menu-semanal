@@ -46,6 +46,7 @@ enum Gemini {
             else if name.contains("flash-lite") { r = 20 }
             else if name.contains("flash") { r = 10 }
             if name.contains("preview") || name.contains("exp") { r += 5 }
+            if name.contains("omni") || name.contains("latest") { r += 8 } // alias/variantes raras: después de los estables
             if name.contains("customtools") { r += 2 } // variante: misma familia, va después de la base
             return r
         }
@@ -64,6 +65,23 @@ enum Gemini {
             if ordered.count > 1 { ordered.insert(last, at: 1) }
         }
         return Array(ordered.prefix(limit))
+    }
+
+    /// Reparte los candidatos entre familias (pro, flash, flash-lite) para que los pro
+    /// (cuota gratuita casi nula) no ocupen todos los huecos y los flash sí se prueben.
+    static func diversifiedCandidates(models: [String], lastGood: String?, limit: Int) -> [String] {
+        let ordered = candidateOrder(models: models, lastGood: lastGood, limit: models.count)
+        func tier(_ n: String) -> Int { n.contains("flash-lite") ? 2 : (n.contains("flash") ? 1 : 0) }
+        var tiers: [[String]] = [[], [], []]
+        for m in ordered { tiers[tier(m)].append(m) }
+        var out: [String] = []
+        var i = 0
+        while out.count < limit && tiers.contains(where: { !$0.isEmpty }) {
+            for t in 0..<3 where out.count < limit && i < tiers[t].count { out.append(tiers[t][i]) }
+            i += 1
+            if i > ordered.count { break }
+        }
+        return out
     }
 
     static var lastGoodModel: String? {
@@ -357,7 +375,7 @@ enum Gemini {
             report(0.10, "Consultando los modelos de tu clave…")
         }
         let models = try discoverModels(apiKey)
-        let candidates = candidateOrder(models: models, lastGood: lastGoodModel, limit: 6)
+        let candidates = diversifiedCandidates(models: models, lastGood: lastGoodModel, limit: 6)
         let prompt = menuPrompt(dishes: dishes, history: history, learning: learning, weekKey: weekKey, fixed: fixed)
         let maxCalls = 9
         var calls = 0

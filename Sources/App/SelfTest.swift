@@ -152,6 +152,9 @@ enum SelfTest {
         let bodyBig = #"{"error":{"details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"300s"}]}}"#.data(using: .utf8)!
         check("retrydelay-capped", Gemini.parseRetryDelay(bodyBig) == 65)
         check("retrydelay-nil", Gemini.parseRetryDelay(Data("{}".utf8)) == nil)
+        let divModels = Gemini.rankModels(["gemini-pro-latest", "gemini-2.5-pro", "gemini-3.1-pro-preview", "gemini-omni-1.2-flash", "gemini-2.5-flash", "gemini-3-flash-preview", "gemini-2.5-flash-lite"])
+        let div = Gemini.diversifiedCandidates(models: divModels, lastGood: nil, limit: 6)
+        check("diversify-has-stable-flash", div.contains("gemini-2.5-flash") && div.contains("gemini-2.5-flash-lite") && div.count == 6)
         check("rank-customtools-after-base", Gemini.rankModels(["gemini-3.1-pro-preview-customtools", "gemini-3.1-pro-preview"]).first == "gemini-3.1-pro-preview")
         let dailyBody = #"{"error":{"code":429,"details":[{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_requests_per_model_per_day"}]}]}}"#.data(using: .utf8)!
         check("quota-daily-detected", Gemini.parseQuotaIsDaily(dailyBody))
