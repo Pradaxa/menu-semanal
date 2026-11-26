@@ -70,18 +70,13 @@ enum Gemini {
     /// Reparte los candidatos entre familias (pro, flash, flash-lite) para que los pro
     /// (cuota gratuita casi nula) no ocupen todos los huecos y los flash sí se prueben.
     static func diversifiedCandidates(models: [String], lastGood: String?, limit: Int) -> [String] {
-        let ordered = candidateOrder(models: models, lastGood: lastGood, limit: models.count)
-        func tier(_ n: String) -> Int { n.contains("flash-lite") ? 2 : (n.contains("flash") ? 1 : 0) }
-        var tiers: [[String]] = [[], [], []]
-        for m in ordered { tiers[tier(m)].append(m) }
+        // Como la webapp: flash-lite primero (más cuota gratuita), luego flash y los pro al final
+        let ordered = rankModels(models)
+        func tier(_ n: String) -> Int { n.contains("pro") ? 2 : (n.contains("flash-lite") ? 0 : 1) }
         var out: [String] = []
-        var i = 0
-        while out.count < limit && tiers.contains(where: { !$0.isEmpty }) {
-            for t in 0..<3 where out.count < limit && i < tiers[t].count { out.append(tiers[t][i]) }
-            i += 1
-            if i > ordered.count { break }
-        }
-        return out
+        if let last = lastGood, ordered.contains(last), tier(last) < 2 { out.append(last) }
+        for t in 0..<3 { for m in ordered where tier(m) == t && !out.contains(m) { out.append(m) } }
+        return Array(out.prefix(limit))
     }
 
     /// Motivo legible de un fallo (para el aviso de diagnóstico)
@@ -224,14 +219,23 @@ enum Gemini {
     }
 
     /// mgCall
-    static func call(model: String, key: String, prompt: String, schema: [String: Any]? = nil, timeout: TimeInterval = 30) throws -> String {
+    static func call(model: String, key: String, prompt: String, schema: [String: Any]? = nil, timeout: TimeInterval = 30, thinking: Bool = false) throws -> String {
         let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent")!
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue(key, forHTTPHeaderField: "x-goog-api-key")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = timeout
-        var generationConfig: [String: Any] = ["responseMimeType": "application/json"]
+        // Como la webapp: temperatura 0.4 y tope de salida; y sin "pensar" (más rápido y menos cuota)
+        var generationConfig: [String: Any] = ["responseMimeType": "application/json",
+                                               "temperature": 0.4, "maxOutputTokens": 8192]
+        if thinking {
+            if model.hasPrefix("gemini-2.5") && !model.contains("pro") {
+                generationConfig["thinkingConfig"] = ["thinkingBudget": 0]
+            } else if model.hasPrefix("gemini-3") {
+                generationConfig["thinkingConfig"] = ["thinkingLevel": "low"]
+            }
+        }
         if let schema = schema { generationConfig["responseSchema"] = schema }
         let body: [String: Any] = [
             "contents": [["role": "user", "parts": [["text": prompt]]]],
@@ -420,12 +424,20 @@ enum Gemini {
         ]
         var useSchema = true
         // Con esquema (ids acotados); si Google lo rechaza (400), se repite sin esquema
+        var useThinkingCfg = true
         func attempt(_ model: String, _ text: String) throws -> String {
-            if useSchema {
-                do { return try call(model: model, key: apiKey, prompt: text, schema: menuSchema, timeout: 45) }
-                catch GeminiError.http(let code, _) where code == 400 { useSchema = false }
+            // Ante un 400 se simplifica la petición: primero sin esquema, luego sin ajuste de pensamiento
+            for _ in 0..<3 {
+                do {
+                    return try call(model: model, key: apiKey, prompt: text,
+                                    schema: useSchema ? menuSchema : nil, timeout: 45, thinking: useThinkingCfg)
+                } catch GeminiError.http(let code, _) where code == 400 {
+                    if useSchema { useSchema = false }
+                    else if useThinkingCfg { useThinkingCfg = false }
+                    else { throw GeminiError.http(code, model) }
+                }
             }
-            return try call(model: model, key: apiKey, prompt: text, timeout: 45)
+            throw GeminiError.http(400, model)
         }
         var sawDailyQuota = false
         var sawMinuteQuota = false
@@ -481,9 +493,9 @@ enum Gemini {
                         report(callProgress(), "Cuota diaria agotada en este modelo. Pruebo otro…")
                     } else {
                         sawMinuteQuota = true
-                        retry.append(model)
-                        minWait = min(minWait ?? 65, retryAfter ?? 25)
-                        report(callProgress(), "Este modelo está al límite. Pruebo otro…")
+                        // Como la webapp: un límite por minuto es de la clave, no del modelo; insistir solo lo agrava
+                        _ = retryAfter
+                        break
                     }
                 } catch GeminiError.http(let code, _) where code == 404 {
                     lastError = GeminiError.http(code, model)
